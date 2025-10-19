@@ -1,0 +1,12 @@
+Items:
+1 = coconut milk
+2 = diced mango
+3 = lime juice
+4 = curry powder
+5 = cooked rice
+6 = chickpeas
+7 = curry base
+8 = tropical coconut curry
+Appliances:
+A = saucepan
+B = pot

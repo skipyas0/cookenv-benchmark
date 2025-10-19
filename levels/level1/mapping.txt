@@ -1,0 +1,7 @@
+Items:
+1 = butter
+2 = egg
+3 = dissolved butter
+4 = butter-fried egg
+Appliances:
+A = pan
