@@ -16,6 +16,7 @@ except Exception:
 	pygame = None  # type: ignore
 	_PYGAME_AVAILABLE = False
 
+
 from blocks import Block, Wall, Floor, Dispenser, Appliance, _load_appliance_colors  # type: ignore
 from player import Player  # type: ignore
 from states import Level
@@ -24,114 +25,11 @@ from datetime import datetime
 import asyncio
 import sys
 import time
-import json
+from ui_overlay import draw_game_info, draw_level_info
+from game_utils import send_score, list_levels_dir, prompt_username_pygame
+
 if sys.platform == "emscripten":
 	import js
-
-async def send_score(username, level, game_time, info_presses, time_spent):
-	"""Send a score to the configured Google Apps Script endpoint.
-
-	This function awaits the JS fetch Promise so it doesn't start a
-	synchronous/blocking network operation that could hang the event loop.
-	It is defensive and catches exceptions so network errors don't stop play.
-	"""
-	time_stamp = datetime.utcnow().isoformat()
-	sheets_link = "https://script.google.com/macros/s/AKfycby9VqXkvxME3J2WlFa6nVfR8Sj4NgtRujfYBgUJjxlBCUI-GOYalnK5TgB8en2If4_k/exec"
-	payload = {
-		"username": username,
-		"level": str(level),
-		"gametime": game_time,
-		"infopresses": info_presses,
-		"timespent": time_spent,
-		"time": time_stamp,
-	}
-	#print(payload)
-	
-	payload.update({"token": "abc123xyz"})
-	js_code = f"""
-	fetch("{sheets_link}", {{
-		method: "POST",
-		mode: "no-cors",  // ✅ avoids preflight rejections
-		headers: {{ "Content-Type": "application/json" }},
-		body: {json.dumps(json.dumps(payload))}
-	}})
-	.then(r => console.log("send_score OK", r))
-	.catch(e => console.error("send_score failed", e));
-	"""
-	js.eval(js_code)
-	js.console.log("send_score() invoked")
-
-
-def list_levels_dir(levels_dir: str = "levels") -> list[str]:
-	"""Return a sorted list of level folder paths inside `levels_dir`.
-
-	Sorting is natural lexicographic so level1, level2, ... order is preserved.
-	"""
-	p = Path(levels_dir)
-	if not p.exists() or not p.is_dir():
-		return []
-	entries = [str(x) for x in p.iterdir() if x.is_dir()]
-	# sort by name
-	entries.sort()
-	return entries
-
-
-async def prompt_username_pygame(tile_size: int = 128) -> str:
-	"""Show a simple pygame text-input overlay and return the entered username.
-
-	This function is async so it yields to the event loop (needed for pygbag).
-	"""
-	if not _PYGAME_AVAILABLE:
-		return "player"
-	try:
-		font = pygame.font.SysFont(None, max(18, tile_size // 4))
-	except Exception:
-		font = None
-
-	username = ""
-	active = True
-	clock = pygame.time.Clock()
-	# draw loop
-	while active:
-		for ev in pygame.event.get():
-			if ev.type == pygame.QUIT:
-				active = False
-				break
-			if ev.type == pygame.KEYDOWN:
-				if ev.key == pygame.K_RETURN:
-					active = False
-					break
-				elif ev.key == pygame.K_BACKSPACE:
-					username = username[:-1]
-				else:
-					try:
-						ch = ev.unicode
-						if ch and ch.isprintable():
-							username += ch
-					except Exception:
-						pass
-
-		# render overlay
-		try:
-			w, h = pygame.display.get_surface().get_size()
-			over = pygame.Surface((w, h), pygame.SRCALPHA)
-			over.fill((0, 0, 0, 180))
-			pygame.display.get_surface().blit(over, (0, 0))
-			if font is not None:
-				prompt = "Enter username: " + username
-				surf = font.render(prompt, True, (240, 240, 240))
-				pygame.display.get_surface().blit(
-					surf, ((w - surf.get_width()) // 2, h // 2)
-				)
-			pygame.display.flip()
-		except Exception:
-			pass
-
-		await asyncio.sleep(0.02)
-		clock.tick(30)
-
-	return username or "player"
-
 
 async def play_levels(start_folder: str | None = None, use_text: bool = True) -> None:
 	"""Play all levels starting from the lowest available.
@@ -422,7 +320,8 @@ class Game:
 
 		running = True
 		clock = pygame.time.Clock()
-		show_info = False
+		show_game_info = True
+		show_level_info = False
 		# end-of-level state
 		level_completed = False
 		end_choice = None  # 'repeat', 'continue', 'exit'
@@ -433,12 +332,18 @@ class Game:
 				elif event.type == pygame.KEYDOWN:
 					# toggle info screen with 'E'
 					if event.key == pygame.K_e:
-						show_info = not show_info
-						if show_info:
+						if not show_game_info and not show_level_info:
 							info_press_counter += 1
+							show_game_info = True
+						elif show_game_info:
+							show_game_info = False
+							show_level_info = True
+						else:
+							show_level_info = False
+							
 						continue
 					# when info screen is shown, ignore other key inputs
-					if show_info:
+					if show_game_info or show_level_info:
 						continue
 
 					# map keys to orientation and movement deltas, then delegate to Player
@@ -491,6 +396,8 @@ class Game:
 								if isinstance(blk, Appliance):
 									blk.tick()
 									blk.try_start_operations()
+					elif event.key == pygame.K_r:
+						player.inventory = None
 
 			# draw background (optional)
 			# fill background for tiles area
@@ -547,119 +454,10 @@ class Game:
 				pass
 
 			# if info screen is toggled, draw it over the entire area and skip drawing the player
-			if show_info and getattr(self, "level", None) is not None:
-				# dark translucent overlay
-				over = pygame.Surface((width, height), pygame.SRCALPHA)
-				over.fill((10, 10, 10, 220))
-				screen.blit(over, (0, 0))
-				# draw the description and mapping text with improved layout
-				try:
-					info_font = pygame.font.SysFont(None, max(16, tile_size // 3))
-					head_font = pygame.font.SysFont(
-						None, max(18, tile_size // 2), bold=True
-					)
-				except Exception:
-					info_font = None
-					head_font = None
-				if info_font is not None and head_font is not None:
-					lvl = self.level
-					# layout
-					x_pad = 24
-					y_pad = 24
-					col_gap = 24
-					desc_w = int(width * 0.62) - 2 * x_pad
-					# left: Description
-					screen.blit(
-						head_font.render("Description", True, (245, 245, 245)),
-						(x_pad, y_pad),
-					)
-					y_cursor = y_pad + head_font.get_height() + 8
-					for para in (lvl.desc or "").split("\n\n"):
-						para = para.strip()
-						if not para:
-							continue
-						if "#" in para:
-							para = para.split("#")[1]
-
-						words = para.split()
-						line = ""
-						for w in words:
-							test = (line + " " + w).strip()
-							surf = info_font.render(test, True, (230, 230, 230))
-							if surf.get_width() > desc_w:
-								# render current
-								if line == "":
-									screen.blit(
-										info_font.render(w, True, (230, 230, 230)),
-										(x_pad + 8, y_cursor),
-									)
-									y_cursor += info_font.get_height() + 6
-									line = ""
-								else:
-									screen.blit(
-										info_font.render(line, True, (230, 230, 230)),
-										(x_pad + 8, y_cursor),
-									)
-									y_cursor += info_font.get_height() + 6
-									line = w
-							else:
-								line = test
-						if line:
-							text_to_render = line
-							screen.blit(
-								info_font.render(text_to_render, True, (230, 230, 230)),
-								(x_pad + 8, y_cursor),
-							)
-							y_cursor += info_font.get_height() + 8
-						# paragraph gap
-						y_cursor += 6
-
-					# right column: mappings
-					right_x = x_pad + desc_w + col_gap
-					try:
-						colors = _load_appliance_colors()
-					except Exception:
-						colors = {}
-
-					# Items
-					screen.blit(
-						head_font.render("Items", True, (245, 245, 245)),
-						(right_x, y_pad),
-					)
-					y_m = y_pad + head_font.get_height() + 8
-					for k, v in (lvl.mapping or {}).items():
-						if k.isdigit():
-							line = f"• {k}: {v}"
-							screen.blit(
-								info_font.render(line, True, (220, 220, 220)),
-								(right_x + 6, y_m),
-							)
-							y_m += info_font.get_height() + 6
-					# Appliances
-					y_m += 8
-					screen.blit(
-						head_font.render("Appliances", True, (245, 245, 245)),
-						(right_x, y_m),
-					)
-					y_m += head_font.get_height() + 8
-					for k, v in (lvl.mapping or {}).items():
-						if k.isalpha():
-							color = colors.get(k)
-							if color is None:
-								text_color = (220, 220, 220)
-							else:
-								text_color = tuple(
-									max(0, min(255, int(c))) for c in color
-								)
-							line = f"• {k}: {v}"
-							screen.blit(
-								info_font.render(line, True, text_color),
-								(right_x + 6, y_m),
-							)
-							y_m += info_font.get_height() + 6
-				else:
-					# no fonts available: skip content
-					pass
+			if show_game_info:
+				draw_game_info(screen, width, height, tile_size)
+			elif show_level_info and getattr(self, "level", None) is not None:
+				draw_level_info(screen, width, height, tile_size, self.level, _load_appliance_colors)
 			else:
 				# draw player via Player.draw (tiles area only)
 				player.draw(screen, tile_size)
@@ -863,6 +661,9 @@ class Game:
 					print("Nothing happened")
 				continue
 			# movement commands
+			if cmd == "drop":
+				print(f"Dropped current item: {player.inventory}")
+				player.inventory = None
 			if cmd in ("up", "down", "left", "right"):
 				dx = dy = 0
 				if cmd == "up":
