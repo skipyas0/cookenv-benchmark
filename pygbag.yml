@@ -4,7 +4,6 @@ on:
 
 jobs:
   build-pygbag:
-    name: Build and deploy pygbag game
     runs-on: ubuntu-latest
 
     steps:
@@ -17,11 +16,11 @@ jobs:
       - name: Clean old build
         run: rm -rf build
 
-      - name: Build project
-        run: python -m pygbag --build main.py
+      - name: Build for web
+        run: python -m pygbag --build main.py --target web
 
       - name: Verify build output
-        run: ls -R build/web
+        run: ls -R build
 
       - name: Deploy to GitHub Pages
         uses: JamesIves/github-pages-deploy-action@v4
