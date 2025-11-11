@@ -34,6 +34,7 @@ Each level is a folder with the following files:
 - `recipe.txt` — operation definitions and `Goal: N`. Example lines:
   - `1 -> A = 3 (3)`  (ingredient 1 into appliance A produces item 3 after 3 steps)
   - `2, 3 -> A = 4 (5)`
+  - `1 ! 10` — Dispenser 1 stops giving ingredients after 10 steps
   - `Goal: 4` — the goal item id the player should obtain to finish the level
 
 Controls
@@ -43,12 +44,16 @@ Controls
 - Interact: SPACE — pick up from dispenser or appliance, or place an item into an appliance.
 - Pass time: Q — advance game time without moving (appliances tick).
 - Toggle info overlay: E — shows the textual `desc.txt` and `mapping.txt` in a formatted overlay. Press again to return to the game.
+- Restart: CTRL + R — restarts the level
+- Level select: CTRL + S
+- Give up: CTRL + G — continues to the next level
 
 Visuals and assets
 ------------------
 
 - If `pygame` is available, the game renders a graphical window and draws tiles using assets in the `assets/` folder when available. If assets are missing, the game falls back to color fills and geometric drawings.
 - `appliance_colors.csv` in `assets/` can define RGB colors per appliance (e.g. `A, 206, 140, 73`). These colors are used for operation progress fills and for coloring appliance names in the info overlay.
+- For item dispensers and appliances defined in mapping.txt, the game tries to load a .png image for its associated name, where spaces in the name are replaced with underscores. If the resulting name matches an existing .png file in the assets directory, the image icon will be successfully loaded. If not, the game falls back to the character coding with `appliance_colors.csv` visualisation
 
 Extensibility and development notes
 -----------------------------------
@@ -78,8 +83,6 @@ Next improvements you might want
 ------------------------------
 
 - Add vertical scrolling for the info overlay.
-- Add item icons in the HUD and overlay when images are available.
-- Add keyboard shortcuts for restarting the level, toggling debug overlays, or stepping time.
 - Improve recipe parsing and validation and provide a `build_level.py` helper for level authors.
 
 Contributing
