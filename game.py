@@ -31,6 +31,33 @@ from game_utils import send_score, list_levels_dir, prompt_username_pygame
 if sys.platform == "emscripten":
 	import js
 
+
+def level_prompt_txt(levels : list[str]) -> int:
+
+	while True:
+		print("Available levels: ")
+		_len = len(levels)
+		for i in range(0, _len):
+			print(i, end=" ")
+		print()
+
+		cmd = input("> ").strip().lower()
+		if (cmd == "quit" or cmd == "continue" or cmd == "repeat" or
+		   cmd == "q" or cmd == "c" or cmd == "r"):
+			return cmd;
+		if not cmd.isdigit() or not isinstance(cmd,int):
+			print("Not a valid choice");
+			continue;
+		choice = int(cmd)
+
+		if choice < 0 or choice >= _len:
+			print("Not a valid choice");
+			continue;
+
+		return choice
+
+
+
 async def play_levels(start_folder: str | None = None, use_text: bool = True) -> None:
 	"""Play all levels starting from the lowest available.
 
@@ -74,16 +101,29 @@ async def play_levels(start_folder: str | None = None, use_text: bool = True) ->
 			completed, game_time, choice, info_presses = await game.run_pygame()
 		time_spent = time.time() - t0
 
-		if sys.platform == "emscripten":
-			await send_score(
-				username, lvl.path, game_time if completed else -1, info_presses, time_spent
-			)
-			await asyncio.sleep(0)
-		else:
-			with open(score_file, "a+") as f:
-				f.write(f"{username}, {lvl.path}, {game_time if completed else -1}, {info_presses}, {time_spent}")
+		if completed != -1: #skip
+			if sys.platform == "emscripten":
+				await send_score(
+					username, lvl.path, game_time if completed else -1, info_presses, time_spent
+				)
+				await asyncio.sleep(0)
+			else:
+				with open(score_file, "a+") as f:
+					f.write(f"{username}, {lvl.path}, {game_time if completed else -1}, {info_presses}, {time_spent}")
 				 
 		# interpret choice
+		if choice == "level_skip":
+			if use_text:
+				choice = level_prompt_txt(levels);
+				if isinstance(choice, int): #if not, user chose quit|continue|repeat
+					idx = choice;
+					continue;
+			else:
+				choice = await game.prompt_level(levels)
+				if isinstance(choice, int): #if not, user chose quit|continue|repeat
+					idx = choice;
+					continue;
+
 		if choice == "repeat":
 			print(f"Repeating level {lvl_path}")
 			continue
@@ -241,6 +281,115 @@ class Game:
 					chars.append(block.char)
 			lines.append("".join(chars))
 		return "\n".join(lines)
+	
+	async def prompt_level(	
+		self,
+		levels: list[str],
+		tile_size: int = 128,
+		caption: str = "CookEnv",
+		scale_to_display: bool = True,
+		margin: float = 0.95,
+		min_tile_size: int = 24)-> int:
+		if not _PYGAME_AVAILABLE:
+			raise RuntimeError("pygame is not available in this environment")
+		font_size=35
+		txt_color=(255,255,255)
+		width = 600
+		height = 800
+		choice="None"
+
+
+		pygame.init()
+		pygame.display.set_caption(caption)
+		screen = pygame.display.set_mode((height, width))
+
+		try:
+			font = pygame.font.Font(None, font_size)
+		except Exception:
+			font = None
+
+		screen.fill((0, 0,0))
+
+		txt="Available levels (type level number or (q)uit|(c)ontinue|(r)epeat): "
+		screen.blit(font.render(txt, True,txt_color),(10,0))
+		
+		txt=""
+		_len = len(levels)
+		for i in range(0, _len -1 ):
+			txt+= f"{str(i)}, "
+		txt+= f"{str(_len -1)}"
+		
+		screen.blit(font.render(txt, True,txt_color),(10,font_size*2+5))
+
+		user_input=""
+		err=""
+		txt_rend= font.render(f"> {user_input}", True,txt_color)
+		pygame.display.flip()
+				
+		changed=True		
+		running = True
+		while running:
+		
+			for event in pygame.event.get():
+				if event.type == pygame.QUIT:
+					running = False
+					break
+				if event.type == pygame.KEYDOWN:
+					if event.key == pygame.K_RETURN: 
+						if (user_input == "quit" or user_input == "continue" or user_input == "repeat" or
+		   					user_input == "q" or user_input == "c" or user_input == "r"):
+							choice = user_input
+							running=False
+							break
+
+						elif not user_input.isdigit():
+							user_input=""
+							err="Not a valid choice"; 
+							changed=True
+							continue
+						else:
+							choice = int(user_input)
+
+							if choice < 0 or choice >= _len:
+								user_input=""
+								err ="Not a valid choice";
+								changed=True
+								continue;
+							
+							running=False
+							break
+
+
+
+					elif event.key == pygame.K_BACKSPACE:
+						user_input = user_input[:-1]
+						changed=True
+					else:
+						user_input += event.unicode
+						changed=True
+			
+			if changed:
+				pygame.draw.rect(screen, (0, 0,0), (10, font_size*5, width,font_size+5)) 
+				txt_rend= font.render(f"> {user_input}", True,txt_color)
+				screen.blit(txt_rend,(10,font_size*5 + 5) )
+				
+				pygame.draw.rect(screen, (0, 0,0), (10, font_size*10, width,font_size+5)) 
+				txt_rend= font.render(err, True,txt_color)
+				screen.blit(txt_rend,(10,font_size*10 + 5) )
+				
+				pygame.display.flip()
+				changed=False	
+
+			await asyncio.sleep(0.05)
+
+		if sys.platform != "emscripten":
+			pygame.quit()
+		return choice
+
+
+
+
+
 
 	async def run_pygame(
 		self,
@@ -249,7 +398,7 @@ class Game:
 		scale_to_display: bool = True,
 		margin: float = 0.95,
 		min_tile_size: int = 24,
-	) -> None:
+	):
 		"""Open a pygame window and render the grid. Blocks' draw methods
 		are used to render each tile.
 		"""
@@ -330,6 +479,24 @@ class Game:
 				if event.type == pygame.QUIT:
 					running = False
 				elif event.type == pygame.KEYDOWN:
+
+					#give_up
+					if event.key == pygame.K_g and event.mod & pygame.KMOD_CTRL:
+						if sys.platform != "emscripten":
+							pygame.quit()
+						return 0, player.game_time, "continue", info_press_counter
+					#restart
+					if event.key == pygame.K_r and event.mod & pygame.KMOD_CTRL:
+						if sys.platform != "emscripten":
+							pygame.quit()
+						return 0, player.game_time, "repeat", info_press_counter
+					
+					#level_skip :)
+					if event.key == pygame.K_s and event.mod & pygame.KMOD_CTRL:
+						if sys.platform != "emscripten":
+							pygame.quit()
+						return -1, player.game_time, "level_skip", info_press_counter
+
 					# toggle info screen with 'E'
 					if event.key == pygame.K_e:
 						if not show_game_info and not show_level_info:
@@ -516,13 +683,13 @@ class Game:
 			# only call pygame.quit() on native platforms; pygbag manages lifecycle in the browser
 			if sys.platform != "emscripten":
 				pygame.quit()
-			return True, player.game_time, end_choice, info_press_counter
+			return 1, player.game_time, end_choice, info_press_counter
 		else:
 			if sys.platform != "emscripten":
 				pygame.quit()
-			return False, player.game_time, None, info_press_counter
+			return 1, player.game_time, None, info_press_counter
 
-	def run_text(self) -> None:
+	def run_text(self):
 		"""Run a simple text-mode loop.
 
 		Commands:
@@ -604,7 +771,7 @@ class Game:
 				for k, v in agg:
 					print(f"  - {k}: {v}")
 
-		print("Text-mode controls: up/down/left/right, interact, info, skip, quit")
+		print("Text-mode controls: up/down/left/right, interact, info, skip, quit, restart, give_up, level_skip")
 		print_board()
 		while True:
 			cmd = input("> ").strip().lower()
@@ -612,11 +779,17 @@ class Game:
 				continue
 			if cmd in ("quit", "exit"):
 				print("Exiting")
-				return False, player.game_time, "exit", info_press_counter
+				return 0, player.game_time, "exit", info_press_counter
 			if cmd == "info":
 				info_press_counter += 1
 				print_info()
 				continue
+			if cmd == "restart":
+				return 0, player.game_time, "repeat", info_press_counter
+			if cmd == "give_up":
+				return 0, player.game_time, "continue", info_press_counter
+			if cmd == "level_skip":
+				return -1, player.game_time, "level_skip", info_press_counter
 			if cmd == "skip":
 				# pass time without moving
 				player.pass_time()
@@ -648,15 +821,15 @@ class Game:
 							if choice not in ("r", "c", "e"):
 								print("Please choose r, c or e")
 						if choice == "r":
-							return True, player.game_time, "repeat", info_press_counter
+							return 1, player.game_time, "repeat", info_press_counter
 						if choice == "c":
 							return (
-								True,
+								1,
 								player.game_time,
 								"continue",
 								info_press_counter,
 							)
-						return True, player.game_time, "exit", info_press_counter
+						return 1, player.game_time, "exit", info_press_counter
 				else:
 					print("Nothing happened")
 				continue
@@ -705,10 +878,10 @@ class Game:
 							if choice not in ("r", "c", "e"):
 								print("Please choose r, c or e")
 						if choice == "r":
-							return True, player.game_time, "repeat"
+							return 1, player.game_time, "repeat"
 						if choice == "c":
-							return True, player.game_time, "continue"
-						return True, player.game_time, "exit"
+							return 1, player.game_time, "continue"
+						return 1, player.game_time, "exit"
 				else:
 					print("Move blocked or out of bounds")
 				print_board()
