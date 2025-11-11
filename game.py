@@ -45,7 +45,7 @@ def level_prompt_txt(levels : list[str]) -> int:
 		if (cmd == "quit" or cmd == "continue" or cmd == "repeat" or
 		   cmd == "q" or cmd == "c" or cmd == "r"):
 			return cmd;
-		if not cmd.isdigit() or not isinstance(cmd,int):
+		if not cmd.isdigit():
 			print("Not a valid choice");
 			continue;
 		choice = int(cmd)
@@ -124,10 +124,10 @@ async def play_levels(start_folder: str | None = None, use_text: bool = True) ->
 					idx = choice;
 					continue;
 
-		if choice == "repeat":
+		if choice == "repeat" or choice == "r":
 			print(f"Repeating level {lvl_path}")
 			continue
-		if choice == "continue":
+		if choice == "continue" or choice == "c":
 			idx += 1
 			if idx >= len(levels):
 				print("No more levels. Exiting.")
@@ -151,6 +151,7 @@ class Game:
 		grid: List[List[Block]],
 		operations: list | None = None,
 		goal: int | None = None,
+		object_mapping: dict[str, object] = None
 	) -> None:
 		assert grid and all(isinstance(r, list) for r in grid), "grid must be a 2D list"
 		# ensure rectangular
@@ -170,6 +171,8 @@ class Game:
 		self.start_orientation: str | None = None
 		# optional Level object (set by from_level)
 		self.level: Level | None = None
+		self.object_mapping=object_mapping
+
 
 	@classmethod
 	def from_level(
@@ -190,6 +193,7 @@ class Game:
 		lines = level_obj.maze_lines
 		ops = level_obj.operations
 		goal = level_obj.goal
+		mapping=level_obj.mapping
 
 		game = cls.from_text_map(lines, goal, mapping=mapping, operations=ops)
 		if level_obj.start_pos is not None:
@@ -213,6 +217,18 @@ class Game:
 								block.add_operation(op)
 						except Exception:
 							pass
+				elif isinstance(block, Dispenser):
+					for op in self.operations:
+						try:
+							dispAttr= getattr(op, "dispenser", None)
+							if ( dispAttr != None and isinstance(dispAttr,int) and block.id.isdigit() 
+		   						and int(block.id) == dispAttr):
+
+								expTime= getattr(op, "expTime", None)
+								if expTime != None:
+									block.setExpirationTime(expTime)
+						except Exception:
+							pass #TODO:
 
 	@classmethod
 	def from_text_map(
@@ -228,10 +244,12 @@ class Game:
 		By default, '#' -> Wall, '.' -> Floor, ' ' -> Floor.
 		"""
 
-		if mapping is None:
-			# mapping values can be either a Block subclass or a callable that
-			# accepts a single character and returns a Block instance.
-			mapping = {"#": Wall, ".": Floor, " ": Floor}
+		#:)))))))))
+		object_mapping=mapping
+		mapping = {"#": Wall, ".": Floor, " ": Floor}
+
+
+		
 
 		grid: List[List[Block]] = []
 		for line in lines:
@@ -241,32 +259,32 @@ class Game:
 				if spec is None:
 					# fallback: digits -> Dispenser, letters -> Appliance
 					if ch.isdigit():
-
-						def make_dispenser(_ch: str) -> Dispenser:  # type: ignore[override]
-							return Dispenser(_ch)
-
-						spec = make_dispenser
+						name=object_mapping.get(ch)
+						if(name== None):
+							obj = Dispenser(ch)
+						else:
+							obj = Dispenser(ch,name)
 					elif ch.isalpha():
-
-						def make_appliance(_ch: str) -> Appliance:  # type: ignore[override]
-							return Appliance(_ch)
-
-						spec = make_appliance
+						name=object_mapping.get(ch)
+						if(name== None):
+							obj = Appliance(ch)
+						else:
+							obj = Appliance(ch,name)
 					else:
 						raise ValueError(f"Unrecognized map character: {ch!r}")
 
-				if isinstance(spec, type) and issubclass(spec, Block):
+					row.append(obj)
+
+				elif isinstance(spec, type) and issubclass(spec, Block):
 					# Block subclass
 					row.append(spec())
-				elif callable(spec):
-					row.append(spec(ch))
 				else:
 					raise ValueError(f"Invalid mapping for character {ch!r}")
 			grid.append(row)
 
-		return cls(grid, operations=operations, goal=goal)
+		return cls(grid, operations, goal,object_mapping)
 
-	def draw(self, player: "Player" | None = None) -> str:
+	def draw(self, player: "Player" | None = None) -> str: #TODO:?
 		"""Render the entire grid to a multiline string using each
 		block's `char` attribute. If `player` is provided, the player's
 		`char` will overlay the corresponding tile.
@@ -543,6 +561,8 @@ class Game:
 										blk.tick()
 										# after ticking, attempt to start any eligible op
 										blk.try_start_operations()
+									elif isinstance(blk, Dispenser):
+										blk.tick()
 
 					elif event.key == pygame.K_SPACE:
 						# interact with the tile in front
@@ -563,6 +583,8 @@ class Game:
 								if isinstance(blk, Appliance):
 									blk.tick()
 									blk.try_start_operations()
+								elif isinstance(blk, Dispenser):
+									blk.tick()
 					elif event.key == pygame.K_r:
 						player.inventory = None
 
@@ -593,7 +615,11 @@ class Game:
 
 			inv_text = "Inventory: empty"
 			if player.inventory is not None:
-				inv_text = f"Inventory: {player.inventory}"
+				objName=self.object_mapping.get(str(player.inventory))
+				if(objName== None):
+					inv_text = f"Inventory: {player.inventory}"
+				else:
+					inv_text = f"Inventory: {objName} ({player.inventory})"
 			gt_text = f"Time: {player.game_time}"
 
 			if font is not None:
@@ -744,6 +770,19 @@ class Game:
 						print(
 							f"  {blk.id} at ({xx},{yy}): {status}; contents={blk.contents}"
 						)
+			print("Dispensers:")
+			for yy, row in enumerate(self.grid):
+				for xx, blk in enumerate(row):
+					if isinstance(blk, Dispenser):
+						status = "available"
+						if (blk.dispenser_time!=-1 and blk.elapsed < blk.dispenser_time):
+							print(f"  {blk.id} at ({xx},{yy}): {status}; remaining time: {blk.dispenser_time - blk.elapsed}")
+						elif (blk.dispenser_time == -1):
+							print(f"  {blk.id} at ({xx},{yy}): {status}; remaining time: infinite")
+						else:
+							status="unavailable"
+							print(f"  {blk.id} at ({xx},{yy}): {status};")
+
 
 		def print_info():
 			lvl = getattr(self, "level", None)
@@ -799,6 +838,8 @@ class Game:
 						if isinstance(blk, Appliance):
 							blk.tick()
 							blk.try_start_operations()
+						elif isinstance(blk, Dispenser):
+							blk.tick()
 				print_board()
 				continue
 			if cmd == "interact":
@@ -861,6 +902,8 @@ class Game:
 							if isinstance(blk, Appliance):
 								blk.tick()
 								blk.try_start_operations()
+							elif isinstance(blk, Dispenser):
+								blk.tick()
 					print_board()
 					if self.goal is not None and player.inventory == self.goal:
 						print(

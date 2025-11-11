@@ -95,20 +95,20 @@ class Player:
 			raise RuntimeError("pygame is required for drawing the player")
 
 		# try to draw sprite asset for player
-		if _PYGAME_AVAILABLE:
-			try:
-				name = {
-					"up": "player_back.png",
-					"down": "player_front.png",
-					"left": "player_left.png",
-					"right": "player_right.png",
-				}[self.orientation]
-				img = _load_player_asset(name)
-				img_s = pygame.transform.smoothscale(img, (tile_size, tile_size))
-				surface.blit(img_s, (self.x * tile_size, self.y * tile_size))
-				return
-			except Exception:
-				pass
+		try:
+			name = {
+				"up": "player_back.png",
+				"down": "player_front.png",
+				"left": "player_left.png",
+				"right": "player_right.png",
+			}[self.orientation]
+			img = _load_player_asset(name)
+			img_s = pygame.transform.smoothscale(img, (tile_size, tile_size))
+			surface.blit(img_s, (self.x * tile_size, self.y * tile_size))
+			return
+		except Exception:
+			pass
+
 		# fallback: draw circle + arrow as before
 		px = self.x * tile_size + tile_size // 2
 		py = self.y * tile_size + tile_size // 2
@@ -174,6 +174,9 @@ class Player:
 		if hasattr(target, "dispense") and self.inventory is None:
 			try:
 				item = target.dispense()  # type: ignore[attr-defined]
+				if(item == -1):
+					print(f"Dispenser at ({tx},{ty}) is not available anymore")
+					return False;
 				self.inventory = item
 				print(f"picked up item {item} from dispenser at ({tx},{ty})")
 				return True

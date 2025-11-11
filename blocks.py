@@ -10,6 +10,7 @@ from abc import ABC, abstractmethod
 from typing import Tuple, List
 from collections import Counter
 from states import Operation  # type: ignore
+import re
 
 try:
 	import pygame
@@ -159,19 +160,58 @@ class Dispenser(Block):
 
 	walkable = False
 
-	def __init__(self, id_char: str):
+	def __init__(self, id_char: str, disp_name: str =""):
 		self.id = id_char
 		self.graphics = (160, 220, 160)
 		self.char = id_char
 		self.walkable = False
 
+		disp_name=disp_name.strip().lower()
+		self.img_name = (re.sub(r'\s+', '_', disp_name))+".png"
+
+		self.dispenser_time=-1
+		self.elapsed = 0
+
+	def setExpirationTime(self, time:int):
+		self.dispenser_time=time
+
+
 	def draw(self, surface, x: int, y: int, tile_size: int) -> None:
 		# draw base (use wall asset as base)
-		if _PYGAME_AVAILABLE:
-			try:
-				base = _load_asset("wall.png")
-				base_s = pygame.transform.smoothscale(base, (tile_size, tile_size))
-				surface.blit(base_s, (x * tile_size, y * tile_size))
+		showCharId=False
+		dead=False
+		if not _PYGAME_AVAILABLE:
+			raise RuntimeError("pygame is required for graphical drawing")
+		
+		try:
+			base = _load_asset("wall.png")
+			base_s = pygame.transform.smoothscale(base, (tile_size, tile_size))
+			surface.blit(base_s, (x * tile_size, y * tile_size))
+
+
+			if self.dispenser_time != -1:
+				progress = self.elapsed / self.dispenser_time
+				fill_h = int(tile_size * progress)
+
+				if progress >= 1: #render 
+					dead=True
+					try:
+						cross = _load_asset("cross.png")
+						cross = pygame.transform.smoothscale(cross, (tile_size/1.3, tile_size/1.3))
+						img_width,img_height = cross.get_size()
+						offsetX = (tile_size-img_width)/2
+						offsetY = (tile_size-img_height)/2
+						surface.blit(cross, (x * tile_size + offsetX, y * tile_size + offsetY))
+					except Exception:
+						pass
+				elif fill_h > 0:
+					# choose a color for the fill: prefer CSV-specified appliance color
+					fill_rect = pygame.Rect(x * tile_size, y * tile_size + tile_size - fill_h, tile_size, fill_h)
+					surface.fill((125,0,0), fill_rect)
+				
+
+
+			if not dead:
 				# overlay dispenser icon if available
 				try:
 					over = _load_asset("dispenser_overlay.png")
@@ -179,24 +219,58 @@ class Dispenser(Block):
 					surface.blit(over_s, (x * tile_size, y * tile_size))
 				except Exception:
 					pass
-			except Exception:
-				# fallback to color base
-				rect = pygame.Rect(x * tile_size, y * tile_size, tile_size, tile_size)
-				surface.fill(self.graphics, rect)
-		else:
-			raise RuntimeError("pygame is required for graphical drawing")
 
-		# draw the id text on top (number)
-		font = pygame.font.SysFont(None, max(12, tile_size // 2))
-		r, g, b = self.graphics
-		color = (156, 187, 189)
-		surf = font.render(self.id, True, color)
-		sw, sh = surf.get_size()
-		sx = x * tile_size + (tile_size - sw) // 2
-		sy = y * tile_size + (tile_size - sh) // 2
-		surface.blit(surf, (sx, sy))
+				if(self.img_name!=""):
+					try:
+						img = _load_asset(self.img_name)
+						img_s = pygame.transform.smoothscale(img, (tile_size/1.3, tile_size/1.3))
+						img_width,img_height = img_s.get_size()
+						offsetX = (tile_size-img_width)/2
+						offsetY = (tile_size-img_height)/2
+						surface.blit(img_s, (x * tile_size + offsetX, y * tile_size + offsetY))
+					except Exception:
+						showCharId=True
+						pass
+				else:
+					showCharId=True
+
+		except Exception:
+			# fallback to color base
+			rect = pygame.Rect(x * tile_size, y * tile_size, tile_size, tile_size)
+			surface.fill(self.graphics, rect)
 
 		
+
+		if showCharId:
+			# draw the id text on top (number)
+			font = pygame.font.SysFont(None, max(12, tile_size // 2))
+			color = (156, 187, 189)
+			surf = font.render(self.id, True, color)
+			sw, sh = surf.get_size()
+			sx = x * tile_size + (tile_size - sw) // 2
+			sy = y * tile_size + (tile_size - sh) // 2
+			surface.blit(surf, (sx, sy))
+		else:
+		#show charId on bottom left-hand corner
+			font = pygame.font.SysFont(None, max(3, tile_size // 5))
+			txt= f"{self.id}"
+			surf = font.render(txt, True, (255,255,255))
+			sw, sh = surf.get_size()
+			sx = x * tile_size + tile_size * 0.1
+			sy = y * tile_size + (tile_size - sh) // 1.1
+			surface.blit(surf, (sx, sy))
+
+
+		#show exp time
+		font = pygame.font.SysFont(None, max(3, tile_size // 5))
+		txt= "inf" if self.dispenser_time==-1 else f"{self.elapsed}/{self.dispenser_time}";
+		surf = font.render(txt, True, (255,255,255))
+		sw, sh = surf.get_size()
+		sx = x * tile_size + (tile_size - sw) // 1.2
+		sy = y * tile_size + (tile_size - sh) // 1.1
+		surface.blit(surf, (sx, sy))
+
+
 
 
 	def dispense(self) -> int:
@@ -205,10 +279,17 @@ class Dispenser(Block):
 		For now dispensers provide an infinite supply of their id.
 		"""
 		try:
+			if(self.dispenser_time != -1 and self.elapsed >= self.dispenser_time ):
+				return -1
+
 			return int(self.id)
 		except Exception:
 			# fallback: return 0 if id not numeric
-			return 0
+			return -1
+		
+	def tick(self) -> None: #¯\_(ツ)_/¯
+		if self.dispenser_time != -1 and self.elapsed < self.dispenser_time:
+			self.elapsed+=1
 
 
 class Appliance(Block):
@@ -216,7 +297,7 @@ class Appliance(Block):
 
 	walkable = False
 
-	def __init__(self, id_char: str):
+	def __init__(self, id_char: str,appl_name: str =""):
 		self.id = id_char
 		self.graphics = (160, 200, 240)
 		self.char = id_char
@@ -230,6 +311,9 @@ class Appliance(Block):
 		self.remaining_time: int = 0
 		# currently active operation (None when idle)
 		self.active_operation: Operation | None = None
+
+		appl_name=appl_name.strip().lower()
+		self.img_name = (re.sub(r'\s+', '_', appl_name))+".png"
 
 		try:
 			colors = _load_appliance_colors()
@@ -250,19 +334,40 @@ class Appliance(Block):
 		
 	def draw(self, surface, x: int, y: int, tile_size: int) -> None:
 		# appliance base asset
-		if _PYGAME_AVAILABLE:
-			try:
+		render_char=True
+		if not _PYGAME_AVAILABLE:
+			raise RuntimeError("pygame is required for graphical drawing")
+
+		try:
+			base = _load_asset("wall.png")
+			base_s = pygame.transform.smoothscale(base, (tile_size, tile_size))
+			surface.blit(base_s, (x * tile_size, y * tile_size))
+			render_char=False
+
+			imgname = self.img_name
+			
+			try:	
+				img = _load_asset(imgname)
+				img_s = pygame.transform.smoothscale(img, (tile_size/1.3, tile_size/1.3))
+				img_width,img_height = img_s.get_size()
+				offsetX = (tile_size-img_width)/2
+				offsetY = (tile_size-img_height)/2
+				surface.blit(img_s, (x * tile_size + offsetX, y * tile_size + offsetY))
+
+			except Exception: #fallback to color id based tile
 				imgname = f"appliance_{self.id}.png"
 				img = _load_asset(imgname)
 				img_s = pygame.transform.smoothscale(img, (tile_size, tile_size))
 				surface.blit(img_s, (x * tile_size, y * tile_size))
-				# if active operation draw progress fill over base
-			except Exception:
-				# fallback to color fill
-				rect = pygame.Rect(x * tile_size, y * tile_size, tile_size, tile_size)
-				surface.fill(self.graphics, rect)
-		else:
-			raise RuntimeError("pygame is required for graphical drawing")
+				render_char=True
+
+					
+			# if active operation draw progress fill over base
+		except Exception:
+			# fallback to color fill
+			rect = pygame.Rect(x * tile_size, y * tile_size, tile_size, tile_size)
+			surface.fill(self.graphics, rect)
+			render_char=True
 
 		# draw operation progress fill if an operation is active
 		if self.active_operation is not None and self.active_operation.time > 0:
@@ -277,14 +382,34 @@ class Appliance(Block):
 				fill_rect = pygame.Rect(x * tile_size, y * tile_size + tile_size - fill_h, tile_size, fill_h)
 				surface.fill(self.fill_color, fill_rect)
 
-		font = pygame.font.SysFont(None, max(8, tile_size // 3))
-		r, g, b = self.graphics
-		color = (60, 60, 60)
-		surf = font.render(self.id, True, color)
-		sw, sh = surf.get_size()
-		sx = x * tile_size + (tile_size - sw) // 2
-		sy = y * tile_size + (tile_size - sh) // 1.8
-		surface.blit(surf, (sx, sy))
+		#show remaining time for recipe
+		if self.active_operation is not None and self.remaining_time > 0:
+			font = pygame.font.SysFont(None, max(3, tile_size // 5))
+			txt= f"{self.remaining_time}"
+			surf = font.render(txt, True, (255,255,255))
+			sw, sh = surf.get_size()
+			sx = x * tile_size + (tile_size - sw) // 1.1
+			sy = y * tile_size + (tile_size - sh) // 1.1 
+			surface.blit(surf, (sx, sy))
+
+		#fallback
+		if render_char == True:
+			font = pygame.font.SysFont(None, max(8, tile_size // 3))
+			color = (60, 60, 60)
+			surf = font.render(self.id, True, color)
+			sw, sh = surf.get_size()
+			sx = x * tile_size + (tile_size - sw) // 2
+			sy = y * tile_size + (tile_size - sh) // 1.8
+			surface.blit(surf, (sx, sy))
+		else:
+			#show charId on bottom left-hand corner
+			font = pygame.font.SysFont(None, max(3, tile_size // 5))
+			txt= f"{self.id}"
+			surf = font.render(txt, True, (255,255,255))
+			sw, sh = surf.get_size()
+			sx = x * tile_size + tile_size * 0.1
+			sy = y * tile_size + (tile_size - sh) // 1.1
+			surface.blit(surf, (sx, sy))
 
 		# draw appliance contents (small numbers) on the top of the tile
 		if hasattr(self, "contents") and self.contents:

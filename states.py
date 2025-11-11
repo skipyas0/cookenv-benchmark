@@ -25,7 +25,10 @@ class Operation:
     product: int
     time: int
 
-
+@dataclass
+class DispenserTimeLimit:
+    dispenser: int
+    expTime: int
 
 
 @dataclass
@@ -101,7 +104,7 @@ class Level:
                 maze_lines.append(row)
 
         # parse recipe file into operations and goal
-        ops: List[Operation] = []
+        ops: List[Operation|DispenserTimeLimit] = []
         goal: Optional[int] = None
         with recipe_file.open("r", encoding="utf-8") as fh:
             for raw in fh.readlines():
@@ -128,7 +131,7 @@ class Level:
                                 prod = int(prod_part.split("(")[0].strip())
                                 time = int(prod_part.split("(")[1].rstrip(")").strip())
                             except Exception:
-                                continue
+                                raise RuntimeError(f"Incorrect recipte file format {recipe_file}. Line {line}")
                         else:
                             continue
                     else:
@@ -136,5 +139,14 @@ class Level:
                         prod = int(m.group(2))
                         time = int(m.group(3))
                     ops.append(Operation(ingredients, app, prod, time))
+                if "!" in line:
+                    disp, time = line.split("!", 1)
+                    disp= disp.strip()
+                    time=time.strip()
+                    if not disp.isdigit() or not time.isdigit():
+                        raise RuntimeError(f"Incorrect recipte file format {recipe_file}. Line {line}")
+                    ops.append(DispenserTimeLimit(int(disp),int(time)))
+                    
+                    
 
         return cls(path=p, desc=desc, mapping=mapping, maze_lines=maze_lines, operations=ops, goal=goal, start_pos=start_pos, start_orientation=start_orientation)
