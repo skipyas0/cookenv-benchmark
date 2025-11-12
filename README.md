@@ -1,8 +1,5 @@
 CookEnv — simple cooking grid-world (planning benchmark)
 
-Acknowledgements
-- main game assets are taken from https://kenney.nl 
-
 
 Overview
 --------
@@ -108,3 +105,4 @@ Credits
 -------
 
 icons by [icons8](https://icons8.com/)
+game assets by [kenney](https://kenney.nl)
