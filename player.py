@@ -171,7 +171,18 @@ class Player:
 
 		target = grid[ty][tx]
 		# pick up from dispenser
-		if hasattr(target, "dispense") and self.inventory is None:
+		if target.__class__.__name__ == "Table":
+			if self.inventory == None and target.has_item():
+				self.inventory = target.pop_item()
+			elif self.inventory != None and not target.has_item():
+				target.add_item(self.inventory)
+				self.inventory=None
+			elif self.inventory != None and target.has_item():
+				T = target.pop_item();
+				target.add_item(self.inventory)
+				self.inventory = T
+			return True
+		if target.__class__.__name__ == "Dispenser" and self.inventory is None:
 			try:
 				item = target.dispense()  # type: ignore[attr-defined]
 				if(item == -1):
@@ -184,7 +195,7 @@ class Player:
 				return False
 
 		# pick up from appliance if it has contents and player inventory is empty
-		if hasattr(target, "contents") and self.inventory is None and getattr(target, "contents", None):
+		if target.__class__.__name__ == "Appliance" and self.inventory is None and getattr(target, "contents", None):
 			try:
 				# take the first item
 				item = target.contents.pop(0)  # type: ignore[attr-defined]
@@ -199,7 +210,7 @@ class Player:
 			# defensive: should not happen
 			return False
 
-		if hasattr(target, "contents") and self.inventory is not None:
+		if target.__class__.__name__ == "Appliance" and self.inventory is not None:
 			try:
 				# limit appliance inventory size to 4
 				if len(target.contents) >= 4:  # type: ignore[attr-defined]

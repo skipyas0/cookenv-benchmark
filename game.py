@@ -17,7 +17,7 @@ except Exception:
 	_PYGAME_AVAILABLE = False
 
 
-from blocks import Block, Wall, Floor, Dispenser, Appliance, _load_appliance_colors  # type: ignore
+from blocks import Block, Wall, Floor, Dispenser, Appliance, Table, _load_appliance_colors  # type: ignore
 from player import Player  # type: ignore
 from states import Level
 from pathlib import Path
@@ -270,6 +270,8 @@ class Game:
 							obj = Appliance(ch)
 						else:
 							obj = Appliance(ch,name)
+					elif ch == "*":
+						obj = Table(object_mapping)
 					else:
 						raise ValueError(f"Unrecognized map character: {ch!r}")
 
