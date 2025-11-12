@@ -467,3 +467,88 @@ class Appliance(Block):
 				print(f"appliance {self.id} started operation -> will produce {op.product} in {op.time} steps")
 				return True
 		return False
+	
+
+class Table(Block):
+	"""A table"""
+
+	walkable = False
+
+	def __init__(self,mapping):
+		self.walkable = False
+		# appliance can hold multiple integer items
+		self.itemName = None
+		self.itemId = None
+		self.mapping = mapping 
+
+	def draw(self, surface, x: int, y: int, tile_size: int) -> None:
+		# appliance base asset
+		render_char=True
+		if not _PYGAME_AVAILABLE:
+			raise RuntimeError("pygame is required for graphical drawing")
+
+		try:
+			base = _load_asset("table.png")
+			base_s = pygame.transform.smoothscale(base, (tile_size, tile_size))
+			surface.blit(base_s, (x * tile_size, y * tile_size))
+			render_char=False
+
+			imgname = self.itemName
+			
+			if imgname != None and imgname != "":
+				try:	
+					img = _load_asset(imgname)
+					img_s = pygame.transform.smoothscale(img, (tile_size/1.3, tile_size/1.3))
+					img_width,img_height = img_s.get_size()
+					offsetX = (tile_size-img_width)/2
+					offsetY = (tile_size-img_height)/2
+					surface.blit(img_s, (x * tile_size + offsetX, y * tile_size + offsetY))
+
+				except Exception: #fallback to color id based tile
+					imgname = "wall.png"
+					img = _load_asset(imgname)
+					img_s = pygame.transform.smoothscale(img, (tile_size, tile_size))
+					surface.blit(img_s, (x * tile_size, y * tile_size))
+					render_char=True
+
+					
+			# if active operation draw progress fill over base
+		except Exception:
+			raise RuntimeError("failed to load imgs")
+
+		#fallback
+		if render_char == True:
+			font = pygame.font.SysFont(None, max(8, tile_size // 3))
+			color = (60, 60, 60)
+			surf = font.render("Table", True, color)
+			sw, sh = surf.get_size()
+			sx = x * tile_size + (tile_size - sw) // 2
+			sy = y * tile_size + (tile_size - sh) // 1.8
+			surface.blit(surf, (sx, sy))
+
+	def add_item(self, itemId) -> int:
+		if self.has_item():
+			return 0;
+		self.itemId=itemId
+
+		itemName = self.mapping.get(str(itemId))
+		
+		if itemName != None:
+			itemName = itemName.strip().lower()
+			self.itemName = (re.sub(r'\s+', '_', itemName))+".png"
+
+		return 1
+	def pop_item(self) -> int:
+		if not self.has_item():
+			return -1
+		
+		itemId=self.itemId
+
+		self.itemId = None
+		self.itemName = None
+		return itemId
+		
+
+	def has_item(self) -> bool:
+		return self.itemId != None
+

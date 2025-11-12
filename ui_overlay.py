@@ -51,14 +51,18 @@ def draw_game_info(screen, width, height, tile_size):
     The map is a grid-world consisting of 4 different block types:
     - floor: light, you can move freely on floor blocks, each move costs you one 'game_time'
     - wall: dark, you can't move through wall blocks
-    - dispenser: marked by a digit 1-9, impassable, you can interact with it using (Space) to acquire an ingredient if your inventory is empty
-    - appliance: marked by a uppercase letter A-E, impassable, you can interact with it using (Space) to either 1. place the contents of your inventory inside or 2. take the contents of the appliance if your inventory is empty
+    - dispenser: marked by a digit 1-9 (in the bottom left-hand corner of a tile) and coresponding item image.
+    Impassable, you can interact with it using (Space) to acquire an ingredient if your inventory is empty. 
+    Some dispenser have an expiration date (specified in the bottom right-hand corner). If the dispenser expires, you won't be able to acquire additional ingredient (the dispenser shows a cross image)
+    - appliance: marked by an uppercase letter A-E (in the bottom left-hand corner of the tile) and coresponding item image.  
+    Impassable, you can interact with it using (Space) to either 1. place the contents of your inventory inside or 2. take the contents of the appliance if your inventory is empty
     
 	If an appliance contains a specific combination of ingredients, it performs an 'operation', yielding a novel ingredient after some amount of 'game_time' passes.
     By using (E), you can display information about the given task - a textual recipe, a mapping which maps objects in the recipe to block ids on the board, inventory and appliance states.
     You can use (R) to drop your current item if needed. Your goal is to perform the actions described in the recipe in as little 'game_time' as possible.
     Each move on the board costs 1 'game_time'. If your move is blocked by an impassable object, the player just changes orientation without incrementing 'game_time'.
     Interacting and summoning info does not cost 'game_time'. If you need to pass 'game_time' without moving, (e.g. when waiting for an appliance to finish an operation), use the (Q) to skip time.
+    You can also use (CTRL + S) to go to a level selection menu, (CTRL + G) to give up, or (CTRL + R) to restart the level
     """)
 
     # Wrap text
