@@ -10,49 +10,62 @@ jobs:
       - name: Checkout repo
         uses: actions/checkout@v4
 
-      - name: Show runner info & repo root
+      - name: Show repo tree (debug)
         run: |
           echo "GITHUB_WORKSPACE=${GITHUB_WORKSPACE}"
           pwd
           ls -la
           echo "==== full tree ===="
-          ls -R .
+          ls -R . | sed -n '1,200p'
 
       - name: Install pygbag
         run: pip install pygbag
 
-      - name: Locate main.py (root or web/)
+      - name: Locate main.py anywhere in repo
         id: locate
         run: |
           echo "Searching for main.py..."
-          if [ -f "${GITHUB_WORKSPACE}/main.py" ]; then
-            echo "Found at repo root"
-            echo "MAIN_PY=${GITHUB_WORKSPACE}/main.py" >> $GITHUB_ENV
-          elif [ -f "${GITHUB_WORKSPACE}/web/main.py" ]; then
-            echo "Found at web/main.py"
-            echo "MAIN_PY=${GITHUB_WORKSPACE}/web/main.py" >> $GITHUB_ENV
-          else
-            echo "ERROR: main.py not found at repo root or web/main.py"
-            echo "Repository tree (for debugging):"
-            ls -R "${GITHUB_WORKSPACE}"
+          MAIN_PATH="$(find . -maxdepth 6 -type f -name "main.py" -print -quit || true)"
+          if [ -z "$MAIN_PATH" ]; then
+            echo "ERROR: main.py not found in repo (searched up to 6 levels)."
+            ls -R .
             exit 1
           fi
-          echo "Will build: $MAIN_PY"
+          echo "Found main.py at: $MAIN_PATH"
+          # normalize absolute path
+          MAIN_ABS="$(realpath "$MAIN_PATH")"
+          echo "MAIN_ABS=$MAIN_ABS" >> $GITHUB_ENV
+          echo "MAIN_DIR=$(dirname "$MAIN_ABS")" >> $GITHUB_ENV
+          echo "MAIN_BASENAME=$(basename "$MAIN_ABS")" >> $GITHUB_ENV
+
+      - name: Show located script info
+        run: |
+          echo "MAIN_ABS = $MAIN_ABS"
+          echo "MAIN_DIR = $MAIN_DIR"
+          echo "MAIN_BASENAME = $MAIN_BASENAME"
+          echo "ls of main dir:"
+          ls -la "$MAIN_DIR" || true
 
       - name: Clean old build
-        run: rm -rf build
+        run: rm -rf "${GITHUB_WORKSPACE}/build"
 
-      - name: Build for web (from script directory)
+      - name: Build for web (run from script directory and force outdir)
         run: |
-          cd "$(dirname "$MAIN_PY")"
-          echo "Current directory: $(pwd)"
-          python -m pygbag --build "$(basename "$MAIN_PY")" --target web
-
+          cd "$MAIN_DIR"
+          echo "PWD: $(pwd)"
+          echo "Listing current dir:"
+          ls -la
+          # build the current directory (.) as the app top-level, and force output to repo build folder
+          python -m pygbag --build . --target web --outdir "${GITHUB_WORKSPACE}/build"
+        env:
+          MAIN_DIR: ${{ env.MAIN_DIR }}
 
       - name: Verify build output
         run: |
-          echo "Build folder tree:"
-          ls -R build || true
+          echo "Build output tree:"
+          ls -R "${GITHUB_WORKSPACE}/build" || true
+          echo "Contents of build/web (if present):"
+          ls -la "${GITHUB_WORKSPACE}/build/web" || true
 
       - name: Deploy to GitHub Pages
         uses: JamesIves/github-pages-deploy-action@v4
