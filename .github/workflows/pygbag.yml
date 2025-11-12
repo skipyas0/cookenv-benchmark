@@ -42,10 +42,12 @@ jobs:
       - name: Clean old build
         run: rm -rf build
 
-      - name: Build for web (using located script)
+      - name: Build for web (from script directory)
         run: |
-          echo "Building with: $MAIN_PY"
-          python -m pygbag --build "$MAIN_PY" --target web
+          cd "$(dirname "$MAIN_PY")"
+          echo "Current directory: $(pwd)"
+          python -m pygbag --build "$(basename "$MAIN_PY")" --target web
+
 
       - name: Verify build output
         run: |
