@@ -25,8 +25,9 @@ from datetime import datetime
 import asyncio
 import sys
 import time
+import re
 from ui_overlay import draw_game_info, draw_level_info
-from game_utils import send_score, list_levels_dir, prompt_username_pygame
+from game_utils import send_score, list_levels_dir, prompt_username_pygame, _load_appliance_colors, _load_asset
 
 if sys.platform == "emscripten":
 	import js
@@ -44,15 +45,15 @@ def level_prompt_txt(levels : list[str]) -> int:
 		cmd = input("> ").strip().lower()
 		if (cmd == "quit" or cmd == "continue" or cmd == "repeat" or
 		   cmd == "q" or cmd == "c" or cmd == "r"):
-			return cmd;
+			return cmd
 		if not cmd.isdigit():
-			print("Not a valid choice");
+			print("Not a valid choice")
 			continue;
 		choice = int(cmd)
 
 		if choice < 0 or choice >= _len:
-			print("Not a valid choice");
-			continue;
+			print("Not a valid choice")
+			continue
 
 		return choice
 
@@ -305,11 +306,11 @@ class Game:
 	async def prompt_level(	
 		self,
 		levels: list[str],
-		tile_size: int = 128,
+		tile_size: int = 64,
 		caption: str = "CookEnv",
 		scale_to_display: bool = True,
 		margin: float = 0.95,
-		min_tile_size: int = 24)-> int:
+		min_tile_size: int = 16)-> int:
 		if not _PYGAME_AVAILABLE:
 			raise RuntimeError("pygame is not available in this environment")
 		font_size=35
@@ -413,11 +414,11 @@ class Game:
 
 	async def run_pygame(
 		self,
-		tile_size: int = 128,
+		tile_size: int = 64,
 		caption: str = "CookEnv",
 		scale_to_display: bool = True,
 		margin: float = 0.95,
-		min_tile_size: int = 24,
+		min_tile_size: int = 16,
 	):
 		"""Open a pygame window and render the grid. Blocks' draw methods
 		are used to render each tile.
@@ -455,7 +456,7 @@ class Game:
 
 		width = cols * tile_size
 		# reserve HUD height equal to one tile for a simple bottom HUD
-		hud_height = max(32, tile_size // 3)
+		hud_height = max(48, tile_size // 2)
 		height = rows * tile_size + hud_height
 		screen = pygame.display.set_mode((width, height))
 		pygame.display.set_caption(caption)
@@ -616,12 +617,16 @@ class Game:
 				font = None
 
 			inv_text = "Inventory: empty"
+			obj_image = None
 			if player.inventory is not None:
-				objName=self.object_mapping.get(str(player.inventory))
-				if(objName== None):
+				obj_name=self.object_mapping.get(str(player.inventory))
+				if obj_name is None:
 					inv_text = f"Inventory: {player.inventory}"
 				else:
-					inv_text = f"Inventory: {objName} ({player.inventory})"
+					inv_text = f"Inventory: {obj_name} ({player.inventory})"
+				obj_image = _load_asset((re.sub(r'\s+', '_', obj_name))+".png")
+
+
 			gt_text = f"Time: {player.game_time}"
 
 			if font is not None:
@@ -636,6 +641,12 @@ class Game:
 						+ (hud_height - surf_inv.get_height()) // 2,
 					),
 				)
+				if obj_image is not None:
+					screen.blit(pygame.transform.scale(obj_image, (0.8*hud_height, 0.8*hud_height)), (
+						16 + surf_inv.get_width(),
+						len(self.grid) * tile_size + hud_height // 16 ,
+					),)
+
 				screen.blit(
 					surf_time,
 					(

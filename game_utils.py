@@ -3,6 +3,7 @@ import asyncio
 import sys
 from pathlib import Path
 from datetime import datetime
+from typing import Tuple, List
 try:
 	import pygame
 
@@ -117,4 +118,68 @@ async def prompt_username_pygame(tile_size: int = 128) -> str:
 
 	return username or "player"
 
+# asset cache: original loaded surfaces (not scaled)
+_ASSET_CACHE: dict[str, "pygame.Surface"] = {}
 
+# cache for appliance colors loaded from CSV
+_APPLIANCE_COLORS: dict[str, Tuple[int, int, int]] | None = None
+
+
+def _load_asset(name: str):
+	"""Load an asset from the assets/ directory next to this file.
+
+	Returns a pygame.Surface or raises if not found / pygame unavailable.
+	"""
+	if not _PYGAME_AVAILABLE:
+		raise RuntimeError("pygame required to load assets")
+	if name in _ASSET_CACHE:
+		return _ASSET_CACHE[name]
+	from pathlib import Path
+
+	assets_dir = Path(__file__).parent / "assets"
+	path = assets_dir / name
+	if not path.exists():
+		raise FileNotFoundError(f"asset not found: {path}")
+	surf = pygame.image.load(str(path)).convert_alpha()
+	_ASSET_CACHE[name] = surf
+	return surf
+
+
+def _load_appliance_colors() -> dict[str, Tuple[int, int, int]]:
+	"""Load appliance_colors.csv from the assets directory and return a map
+	from appliance id (single letter) to (r,g,b) tuples.
+	"""
+	global _APPLIANCE_COLORS
+	if _APPLIANCE_COLORS is not None:
+		return _APPLIANCE_COLORS
+	from pathlib import Path
+
+	assets_dir = Path(__file__).parent / "assets"
+	csv_path = assets_dir / "appliance_colors.csv"
+	colors: dict[str, Tuple[int, int, int]] = {}
+	if not csv_path.exists():
+		_APPLIANCE_COLORS = colors
+		return colors
+	try:
+		with csv_path.open("r", encoding="utf-8") as fh:
+			for raw in fh.readlines():
+				line = raw.strip()
+				if not line or line.startswith("#"):
+					continue
+				parts = [p.strip() for p in line.split(",")]
+				if len(parts) >= 4:
+					key = parts[0]
+					try:
+						r = int(parts[1])
+						g = int(parts[2])
+						b = int(parts[3])
+						colors[key] = (r, g, b)
+					except Exception:
+						continue
+	except Exception:
+		# any error: return empty mapping
+		_APPLIANCE_COLORS = {}
+		return _APPLIANCE_COLORS
+
+	_APPLIANCE_COLORS = colors
+	return colors
