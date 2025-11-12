@@ -17,6 +17,7 @@ jobs:
         run: rm -rf build
 
       - name: Build for web
+        working-directory: ${{ github.workspace }}
         run: python -m pygbag --build main.py --target web
 
       - name: Verify build output
