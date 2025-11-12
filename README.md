@@ -2,10 +2,12 @@ CookEnv — simple cooking grid-world (planning benchmark)
 
 Overview
 --------
+
 CookEnv is a minimal, extensible grid-world implemented in Python and pygame. It models a small kitchen domain with ingredient dispensers, appliances (pans, ovens, etc.), and a single player agent. The environment is designed to serve as a simple planning benchmark: levels describe maps, operations (recipes), goals, and human-readable mappings.
 
 Key concepts
 ------------
+
 - Grid world: The world is a rectangular grid of Block objects. Each tile may be a Wall, Floor, Dispenser (numeric ingredient provider) or Appliance (lettered device that can run operations).
 - Player: A single controllable agent with an orientation, single-slot inventory, and a game-time counter. Player interacts with the world using keyboard controls.
 - Operations: Each Appliance can be configured with Operation objects that specify input ingredient ids, a product id, and a duration (time steps). Appliances start operations when their contents match the required ingredients and produce the product after the specified time.
@@ -13,6 +15,7 @@ Key concepts
 
 Project layout
 --------------
+
 - `game.py` — main Game class, pygame loop, level loading helper, HUD and info overlay.
 - `blocks.py` — Block base class and concrete block types: `Wall`, `Floor`, `Dispenser`, `Appliance`. Also contains asset loading helpers and appliance color parsing.
 - `player.py` — Player class (movement, orientation, inventory, drawing).
@@ -22,7 +25,9 @@ Project layout
 
 Level format
 ------------
+
 Each level is a folder with the following files:
+
 - `desc.txt` — human-readable textual description of the recipe/goal (shown in the info overlay).
 - `mapping.txt` — human-readable mapping of item ids and appliance letters to names, e.g. `1 = butter` and `A = pan`.
 - `maze.txt` — ASCII map; characters used:
@@ -94,3 +99,8 @@ License
 -------
 
 Use as you wish for experiments and teaching. No warranty provided.
+
+Credits
+-------
+
+icons by [icons8](https://icons8.com/)
