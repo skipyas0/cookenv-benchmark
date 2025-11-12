@@ -139,7 +139,9 @@ def _load_asset(name: str):
 	assets_dir = Path(__file__).parent / "assets"
 	path = assets_dir / name
 	if not path.exists():
-		raise FileNotFoundError(f"asset not found: {path}")
+		return None
+		print(f"Warning: _load_asset, asset not found: {path}")
+	
 	surf = pygame.image.load(str(path)).convert_alpha()
 	_ASSET_CACHE[name] = surf
 	return surf
