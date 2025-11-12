@@ -8,6 +8,6 @@ Items:
 7 = tomato sauce
 8 = spaghetti with tomato sauce
 Appliances:
-A = pot
+A = cooking pot
 B = pan
 C = bowl

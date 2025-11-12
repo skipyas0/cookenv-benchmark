@@ -8,7 +8,7 @@ Items:
 7 = baked cake
 8 = cooled cake
 9 = frosting
-10 = layered chocolate cake
+10 = chocolate cake
 Appliances:
 A = bowl
 B = oven

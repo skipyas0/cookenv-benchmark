@@ -10,7 +10,7 @@ Items:
 9 = potatoes
 10 = mixed eggs
 11 = heated butter
-12 = purified butter
+12 = dissolved butter
 13 = bread dough
 14 = risen dough
 15 = bread
