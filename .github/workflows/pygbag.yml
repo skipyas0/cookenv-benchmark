@@ -10,18 +10,47 @@ jobs:
       - name: Checkout repo
         uses: actions/checkout@v4
 
+      - name: Show runner info & repo root
+        run: |
+          echo "GITHUB_WORKSPACE=${GITHUB_WORKSPACE}"
+          pwd
+          ls -la
+          echo "==== full tree ===="
+          ls -R .
+
       - name: Install pygbag
         run: pip install pygbag
+
+      - name: Locate main.py (root or web/)
+        id: locate
+        run: |
+          echo "Searching for main.py..."
+          if [ -f "${GITHUB_WORKSPACE}/main.py" ]; then
+            echo "Found at repo root"
+            echo "MAIN_PY=${GITHUB_WORKSPACE}/main.py" >> $GITHUB_ENV
+          elif [ -f "${GITHUB_WORKSPACE}/web/main.py" ]; then
+            echo "Found at web/main.py"
+            echo "MAIN_PY=${GITHUB_WORKSPACE}/web/main.py" >> $GITHUB_ENV
+          else
+            echo "ERROR: main.py not found at repo root or web/main.py"
+            echo "Repository tree (for debugging):"
+            ls -R "${GITHUB_WORKSPACE}"
+            exit 1
+          fi
+          echo "Will build: $MAIN_PY"
 
       - name: Clean old build
         run: rm -rf build
 
-      - name: Build for web
-        working-directory: ${{ github.workspace }}
-        run: python -m pygbag --build main.py --target web
+      - name: Build for web (using located script)
+        run: |
+          echo "Building with: $MAIN_PY"
+          python -m pygbag --build "$MAIN_PY" --target web
 
       - name: Verify build output
-        run: ls -R build
+        run: |
+          echo "Build folder tree:"
+          ls -R build || true
 
       - name: Deploy to GitHub Pages
         uses: JamesIves/github-pages-deploy-action@v4
