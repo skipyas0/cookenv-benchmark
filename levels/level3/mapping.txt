@@ -1,5 +1,5 @@
 Items:
-1 = eggs
+1 = egg
 2 = flour
 3 = milk
 4 = water
@@ -32,7 +32,7 @@ Items:
 Appliances:
 A = stand mixer
 B = pan
-C = pot
+C = cooking pot
 D = strainer
 E = plate
 F = oven

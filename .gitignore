@@ -4,3 +4,4 @@ __pycache__
 levels/scores-*.txt
 transcript.json
 worker.js
+level_archive

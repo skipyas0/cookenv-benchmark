@@ -11,5 +11,5 @@ Items:
 10 = layered chocolate cake
 Appliances:
 A = bowl
-B = baking pan
+B = oven
 C = fridge
