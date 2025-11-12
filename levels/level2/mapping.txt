@@ -1,12 +1,15 @@
 Items:
-1 = bowl of chickpeas
-2 = tahini
-3 = salt
-4 = olive oil
-5 = soaked chickpeas
-6 = cooked chickpeas
-7 = hummus
+1 = flour
+2 = sugar
+3 = cocoa powder
+4 = butter
+5 = cream
+6 = cake batter
+7 = baked cake
+8 = cooled cake
+9 = frosting
+10 = layered chocolate cake
 Appliances:
-A = blender
-B = cooking pot
-C = water tap
+A = bowl
+B = baking pan
+C = fridge

@@ -1,0 +1,12 @@
+Items:
+1 = bowl of chickpeas
+2 = tahini
+3 = salt
+4 = olive oil
+5 = soaked chickpeas
+6 = cooked chickpeas
+7 = hummus
+Appliances:
+A = blender
+B = cooking pot
+C = water tap

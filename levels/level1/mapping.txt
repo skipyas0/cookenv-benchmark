@@ -1,7 +1,13 @@
 Items:
-1 = butter
-2 = egg
-3 = dissolved butter
-4 = butter-fried egg
+1 = water
+2 = dry spaghetti
+3 = chopped tomatoes
+4 = olive oil
+5 = boiled water
+6 = cooked spaghetti
+7 = tomato sauce
+8 = spaghetti with tomato sauce
 Appliances:
-A = pan
+A = pot
+B = pan
+C = bowl

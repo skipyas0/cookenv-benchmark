@@ -362,7 +362,7 @@ class Game:
 
 						elif not user_input.isdigit():
 							user_input=""
-							err="Not a valid choice"; 
+							err="Not a valid choice"
 							changed=True
 							continue
 						else:
@@ -370,9 +370,9 @@ class Game:
 
 							if choice < 0 or choice >= _len:
 								user_input=""
-								err ="Not a valid choice";
+								err ="Not a valid choice"
 								changed=True
-								continue;
+								continue
 							
 							running=False
 							break
@@ -499,18 +499,18 @@ class Game:
 				elif event.type == pygame.KEYDOWN:
 
 					#give_up
-					if event.key == pygame.K_g and event.mod & pygame.KMOD_CTRL:
+					if event.key == pygame.K_k:
 						if sys.platform != "emscripten":
 							pygame.quit()
 						return 0, player.game_time, "continue", info_press_counter
 					#restart
-					if event.key == pygame.K_r and event.mod & pygame.KMOD_CTRL:
+					if event.key == pygame.K_o:
 						if sys.platform != "emscripten":
 							pygame.quit()
 						return 0, player.game_time, "repeat", info_press_counter
 					
 					#level_skip :)
-					if event.key == pygame.K_s and event.mod & pygame.KMOD_CTRL:
+					if event.key == pygame.K_l:
 						if sys.platform != "emscripten":
 							pygame.quit()
 						return -1, player.game_time, "level_skip", info_press_counter
@@ -934,4 +934,4 @@ class Game:
 
 
 if __name__ == "__main__":
-	asyncio.run(play_levels(start_folder="levels", use_text=True))
+	asyncio.run(play_levels(start_folder="levels", use_text=False))

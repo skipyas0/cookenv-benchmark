@@ -87,7 +87,7 @@ def draw_level_info(screen, width, height, tile_size, level, _load_appliance_col
     screen.blit(over, (0, 0))
 
     try:
-        info_font = pygame.font.SysFont(None, max(16, tile_size // 3))
+        info_font = pygame.font.SysFont(None, max(12, tile_size // 4))
         head_font = pygame.font.SysFont(None, max(18, tile_size // 2), bold=True)
     except Exception:
         return
@@ -117,7 +117,7 @@ def draw_level_info(screen, width, height, tile_size, level, _load_appliance_col
         y_cursor += 8  # paragraph spacing
 
     # Right: Mapping
-    right_x = x_pad + desc_w + col_gap
+    right_x1 = x_pad + desc_w + col_gap
     try:
         colors = _load_appliance_colors()
     except Exception:
@@ -125,19 +125,20 @@ def draw_level_info(screen, width, height, tile_size, level, _load_appliance_col
 
     # Items
     y_m = y_pad
-    screen.blit(head_font.render("Items", True, (245, 245, 245)), (right_x, y_m))
+    screen.blit(head_font.render("Items", True, (245, 245, 245)), (right_x1, y_m))
     y_m += head_font.get_height() + 8
     for k, v in (lvl.mapping or {}).items():
         if k.isdigit():
             line = f"• {k}: {v}"
             screen.blit(
-                info_font.render(line, True, (220, 220, 220)), (right_x + 6, y_m)
+                info_font.render(line, True, (220, 220, 220)), (right_x1 + 6, y_m)
             )
             y_m += info_font.get_height() + 6
 
     # Appliances
-    y_m += 8
-    screen.blit(head_font.render("Appliances", True, (245, 245, 245)), (right_x, y_m))
+    y_m = y_pad
+    right_x2 = x_pad + 1.25*desc_w + col_gap
+    screen.blit(head_font.render("Appliances", True, (245, 245, 245)), (right_x2, y_m))
     y_m += head_font.get_height() + 8
     for k, v in (lvl.mapping or {}).items():
         if k.isalpha():
@@ -148,5 +149,5 @@ def draw_level_info(screen, width, height, tile_size, level, _load_appliance_col
                 else tuple(max(0, min(255, int(c))) for c in color)
             )
             line = f"• {k}: {v}"
-            screen.blit(info_font.render(line, True, text_color), (right_x + 6, y_m))
+            screen.blit(info_font.render(line, True, text_color), (right_x2 + 6, y_m))
             y_m += info_font.get_height() + 6

@@ -299,6 +299,8 @@ class Appliance(Block):
 
 	def __init__(self, id_char: str,appl_name: str =""):
 		self.id = id_char
+		self.repre_id_mod = chr(65 + (ord(self.id) - 65) % 5)
+		print(self.id, "->", self.repre_id_mod)
 		self.graphics = (160, 200, 240)
 		self.char = id_char
 		self.walkable = False
@@ -317,7 +319,7 @@ class Appliance(Block):
 
 		try:
 			colors = _load_appliance_colors()
-			ap_color = colors.get(self.id)
+			ap_color = colors.get(self.repre_id_mod)
 		except Exception:
 			ap_color = None
 		if ap_color is not None:
@@ -355,7 +357,7 @@ class Appliance(Block):
 				surface.blit(img_s, (x * tile_size + offsetX, y * tile_size + offsetY))
 
 			except Exception: #fallback to color id based tile
-				imgname = f"appliance_{self.id}.png"
+				imgname = f"appliance_{self.repre_id_mod}.png"
 				img = _load_asset(imgname)
 				img_s = pygame.transform.smoothscale(img, (tile_size, tile_size))
 				surface.blit(img_s, (x * tile_size, y * tile_size))
