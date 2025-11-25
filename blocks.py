@@ -410,6 +410,7 @@ class Table(Block):
 	"""A table"""
 
 	walkable = False
+	char = "*"
 
 	def __init__(self,mapping):
 		self.walkable = False

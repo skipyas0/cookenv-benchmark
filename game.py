@@ -795,6 +795,14 @@ class Game:
 						else:
 							status="unavailable"
 							print(f"  {blk.id} at ({xx},{yy}): {status};")
+			print("Tables:")
+			for yy, row in enumerate(self.grid):
+				for xx, blk in enumerate(row):
+					if isinstance(blk, Table):
+						if blk.has_item():
+							print(f" Table at ({xx},{yy}): {blk.itemId}")
+						else:
+							print(f" Table at ({xx},{yy}): EMPTY")
 
 
 		def print_info():
