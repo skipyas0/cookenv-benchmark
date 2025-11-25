@@ -23,6 +23,7 @@ from states import Level
 from pathlib import Path
 from datetime import datetime
 import asyncio
+from bfs  import *
 import sys
 import time
 import re
@@ -31,6 +32,8 @@ from game_utils import send_score, list_levels_dir, prompt_username_pygame, _loa
 
 if sys.platform == "emscripten":
 	import js
+
+usePathFindForAi : bool = False;
 
 
 def level_prompt_txt(levels : list[str]) -> int:
@@ -97,7 +100,10 @@ async def play_levels(start_folder: str | None = None, use_text: bool = True) ->
 
 		t0 = time.time()
 		if use_text:
-			completed, game_time, choice, info_presses = game.run_text()
+			if usePathFindForAi:
+				completed, game_time, choice, info_presses = game.run_text_pathfind()
+			else:
+				completed, game_time, choice, info_presses = game.run_text()
 		else:
 			completed, game_time, choice, info_presses = await game.run_pygame()
 		time_spent = time.time() - t0
@@ -728,6 +734,218 @@ class Game:
 				pygame.quit()
 			return 1, player.game_time, None, info_press_counter
 
+	def __print_board(self,player : Player):
+		print(self.draw(player))
+		print(f"Time: {player.game_time}")
+		print(
+			f"Inventory: {player.inventory if player.inventory is not None else 'empty'}"
+		)
+		# appliances status
+		print("Appliances:")
+		for yy, row in enumerate(self.grid):
+			for xx, blk in enumerate(row):
+				if isinstance(blk, Appliance):
+					status = "idle"
+					if blk.active_operation is not None:
+						op = blk.active_operation
+						status = f"running {op.ingredients} -> {op.product}, remaining={blk.remaining_time}"
+					print(
+						f"  {blk.id} at ({xx},{yy}): {status}; contents={blk.contents}"
+					)
+		print("Dispensers:")
+		for yy, row in enumerate(self.grid):
+			for xx, blk in enumerate(row):
+				if isinstance(blk, Dispenser):
+					status = "available"
+					if (blk.dispenser_time!=-1 and blk.elapsed < blk.dispenser_time):
+						print(f"  {blk.id} at ({xx},{yy}): {status}; remaining time: {blk.dispenser_time - blk.elapsed}")
+					elif (blk.dispenser_time == -1):
+						print(f"  {blk.id} at ({xx},{yy}): {status};")
+					else:
+						status="unavailable"
+						print(f"  {blk.id} at ({xx},{yy}): {status};")
+		print("Tables:")
+		for yy, row in enumerate(self.grid):
+			for xx, blk in enumerate(row):
+				if isinstance(blk, Table):
+					if blk.has_item():
+						print(f" Table at ({xx},{yy}): {blk.itemId}")
+					else:
+						print(f" Table at ({xx},{yy}): EMPTY")
+
+
+	def __print_info(self):
+		lvl = getattr(self, "level", None)
+		if lvl is None:
+			print("No level info available")
+			return
+		print("\n--- Description ---")
+		for raw in (lvl.desc or "").splitlines():
+			print(raw)
+		print("\n--- Mapping ---")
+		# separate items and appliances
+		items = []
+		agg = []
+		for k, v in (lvl.mapping or {}).items():
+			if k.isdigit():
+				items.append((k, v))
+			else:
+				agg.append((k, v))
+		if items:
+			print("Items:")
+			for k, v in items:
+				print(f"  - {k}: {v}")
+		if agg:
+			print("Appliances:")
+			for k, v in agg:
+				print(f"  - {k}: {v}")
+
+
+
+	def run_text_pathfind(self):
+		player = None
+
+		info_press_counter = 0
+
+		interact_patter=r"interact\s*\(\s*(-?\d+)\s*,\s*(-?\d+)\s*\)"
+
+		if getattr(self, "start_pos", None) is not None:
+			x, y = self.start_pos
+			if (
+				0 <= y < len(self.grid)
+				and 0 <= x < len(self.grid[0])
+				and self.grid[y][x].walkable
+			):
+				player = Player(x, y)
+				if getattr(self, "start_orientation", None) is not None:
+					player.orientation = self.start_orientation
+		if player is None:
+			for y, row in enumerate(self.grid):
+				for x, block in enumerate(row):
+					if block.walkable:
+						player = Player(x, y)
+						break
+				if player is not None:
+					break
+		if player is None:
+			raise RuntimeError("No walkable tile found to place the player")
+
+		print("Text-mode controls: interact (x,y), info, skip, quit, restart, give_up, level_skip")
+		self.__print_board(player)
+		while True:
+			cmd = input("> ").strip().lower()
+			if not cmd:
+				continue
+			if cmd in ("quit", "exit"):
+				print("Exiting")
+				return 0, player.game_time, "exit", info_press_counter
+			if cmd == "info":
+				info_press_counter += 1
+				self.__print_info()
+				continue
+			if cmd == "restart":
+				return 0, player.game_time, "repeat", info_press_counter
+			if cmd == "give_up":
+				return 0, player.game_time, "continue", info_press_counter
+			if cmd == "level_skip":
+				return -1, player.game_time, "level_skip", info_press_counter
+			if cmd == "skip":
+				# pass time without moving
+				player.pass_time()
+				# tick appliances same as on move
+				for ry, rrow in enumerate(self.grid):
+					for rx, blk in enumerate(rrow):
+						if isinstance(blk, Appliance):
+							blk.tick()
+							blk.try_start_operations()
+						elif isinstance(blk, Dispenser):
+							blk.tick()
+				self.__print_board(player)
+				continue
+
+			m = re.match(interact_patter,cmd)
+			if m: 
+				goal_x = int(m.group(1))
+				goal_y = int(m.group(2))
+
+				if goal_x < 0 or goal_y < 0 or goal_x >= len(self.grid[0]) or goal_y >= len(self.grid):
+					print("The inserted position is outside the boundaries of the level")
+					continue
+				if not (isinstance(self.grid[goal_y][goal_x],Appliance) or isinstance(self.grid[goal_y][goal_x],Dispenser) or isinstance(self.grid[goal_y][goal_x],Table)):
+					print("Invalid position. Only Appliances, Dispensers, and Tables are interactable")
+					continue
+
+				distance_traveled, next_position = pathfind_neighbor_any(self.grid,Position(player.x,player.y),Position(goal_x,goal_y))	
+
+				if distance_traveled == -1:
+					print("Position is unreachable") 
+					continue
+
+				player.game_time += distance_traveled
+				# tick appliances and attempt to start ops
+				for ry, rrow in enumerate(self.grid):
+					for rx, blk in enumerate(rrow):
+						if isinstance(blk, Appliance):
+							for a in range(distance_traveled): #TODO: add tick(value)
+								blk.tick()
+								blk.try_start_operations()
+						elif isinstance(blk, Dispenser):
+							for a in range(distance_traveled): #TODO: add tick(value)
+								blk.tick()
+				
+
+				player.y = next_position.y
+				player.x = next_position.x
+
+				if next_position.x + 1  == goal_x:
+					player.set_orientation("right")
+				elif next_position.x -1  == goal_x:
+					player.set_orientation("left")
+				elif next_position.y + 1  == goal_y:
+					player.set_orientation("down")
+				elif next_position.y - 1  == goal_y:
+					player.set_orientation("up")
+
+				self.__print_board(player)
+				changed = player.interact(self.grid)
+				if changed:
+					print("Interaction succeeded")
+					if self.goal is not None and player.inventory == self.goal:
+						print(
+							f"Goal achieved: player has item {self.goal} at time {player.game_time}"
+						)
+						choice = None
+						while choice not in ("r", "c", "e"):
+							choice = (
+								input(
+									"Level complete. (r) repeat, (c) continue, (e) exit: "
+								)
+								.strip()
+								.lower()
+							)
+							if choice not in ("r", "c", "e"):
+								print("Please choose r, c or e")
+						if choice == "r":
+							return 1, player.game_time, "repeat", info_press_counter
+						if choice == "c":
+							return (
+								1,
+								player.game_time,
+								"continue",
+								info_press_counter,
+							)
+						return 1, player.game_time, "exit", info_press_counter
+				else:
+					print("Nothing happened")
+				continue
+			# movement commands
+			if cmd == "drop":
+				print(f"Dropped current item: {player.inventory}")
+				player.inventory = None
+				continue
+			# unknown command
+			print("Unknown command. Use interact (x,y), info, quit, restart, give_up, level_skip")
+
 	def run_text(self):
 		"""Run a simple text-mode loop.
 
@@ -765,74 +983,9 @@ class Game:
 		if player is None:
 			raise RuntimeError("No walkable tile found to place the player")
 
-		def print_board():
-			print(self.draw(player))
-			print(f"Time: {player.game_time}")
-			print(
-				f"Inventory: {player.inventory if player.inventory is not None else 'empty'}"
-			)
-			# appliances status
-			print("Appliances:")
-			for yy, row in enumerate(self.grid):
-				for xx, blk in enumerate(row):
-					if isinstance(blk, Appliance):
-						status = "idle"
-						if blk.active_operation is not None:
-							op = blk.active_operation
-							status = f"running {op.ingredients} -> {op.product}, remaining={blk.remaining_time}"
-						print(
-							f"  {blk.id} at ({xx},{yy}): {status}; contents={blk.contents}"
-						)
-			print("Dispensers:")
-			for yy, row in enumerate(self.grid):
-				for xx, blk in enumerate(row):
-					if isinstance(blk, Dispenser):
-						status = "available"
-						if (blk.dispenser_time!=-1 and blk.elapsed < blk.dispenser_time):
-							print(f"  {blk.id} at ({xx},{yy}): {status}; remaining time: {blk.dispenser_time - blk.elapsed}")
-						elif (blk.dispenser_time == -1):
-							print(f"  {blk.id} at ({xx},{yy}): {status};")
-						else:
-							status="unavailable"
-							print(f"  {blk.id} at ({xx},{yy}): {status};")
-			print("Tables:")
-			for yy, row in enumerate(self.grid):
-				for xx, blk in enumerate(row):
-					if isinstance(blk, Table):
-						if blk.has_item():
-							print(f" Table at ({xx},{yy}): {blk.itemId}")
-						else:
-							print(f" Table at ({xx},{yy}): EMPTY")
-
-
-		def print_info():
-			lvl = getattr(self, "level", None)
-			if lvl is None:
-				print("No level info available")
-				return
-			print("\n--- Description ---")
-			for raw in (lvl.desc or "").splitlines():
-				print(raw)
-			print("\n--- Mapping ---")
-			# separate items and appliances
-			items = []
-			agg = []
-			for k, v in (lvl.mapping or {}).items():
-				if k.isdigit():
-					items.append((k, v))
-				else:
-					agg.append((k, v))
-			if items:
-				print("Items:")
-				for k, v in items:
-					print(f"  - {k}: {v}")
-			if agg:
-				print("Appliances:")
-				for k, v in agg:
-					print(f"  - {k}: {v}")
 
 		print("Text-mode controls: up/down/left/right, interact, info, skip, quit, restart, give_up, level_skip")
-		print_board()
+		self.__print_board(player)
 		while True:
 			cmd = input("> ").strip().lower()
 			if not cmd:
@@ -842,7 +995,7 @@ class Game:
 				return 0, player.game_time, "exit", info_press_counter
 			if cmd == "info":
 				info_press_counter += 1
-				print_info()
+				self.__print_info()
 				continue
 			if cmd == "restart":
 				return 0, player.game_time, "repeat", info_press_counter
@@ -861,7 +1014,7 @@ class Game:
 							blk.try_start_operations()
 						elif isinstance(blk, Dispenser):
 							blk.tick()
-				print_board()
+				self.__print_board(player)
 				continue
 			if cmd == "interact":
 				changed = player.interact(self.grid)
@@ -899,6 +1052,7 @@ class Game:
 			if cmd == "drop":
 				print(f"Dropped current item: {player.inventory}")
 				player.inventory = None
+				continue
 			if cmd in ("up", "down", "left", "right"):
 				dx = dy = 0
 				if cmd == "up":
@@ -925,7 +1079,7 @@ class Game:
 								blk.try_start_operations()
 							elif isinstance(blk, Dispenser):
 								blk.tick()
-					print_board()
+					self.__print_board(player)
 					if self.goal is not None and player.inventory == self.goal:
 						print(
 							f"Goal achieved: player has item {self.goal} at time {player.game_time}"
@@ -948,7 +1102,7 @@ class Game:
 						return 1, player.game_time, "exit"
 				else:
 					print("Move blocked or out of bounds")
-				print_board()
+				self.__print_board(player)
 				continue
 			# unknown command
 			print("Unknown command. Use up/down/left/right, interact, info, quit")
