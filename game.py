@@ -791,7 +791,7 @@ class Game:
 						if (blk.dispenser_time!=-1 and blk.elapsed < blk.dispenser_time):
 							print(f"  {blk.id} at ({xx},{yy}): {status}; remaining time: {blk.dispenser_time - blk.elapsed}")
 						elif (blk.dispenser_time == -1):
-							print(f"  {blk.id} at ({xx},{yy}): {status}; remaining time: infinite")
+							print(f"  {blk.id} at ({xx},{yy}): {status};")
 						else:
 							status="unavailable"
 							print(f"  {blk.id} at ({xx},{yy}): {status};")
@@ -947,4 +947,4 @@ class Game:
 
 
 if __name__ == "__main__":
-	asyncio.run(play_levels(start_folder="levels", use_text=False))
+	asyncio.run(play_levels(start_folder="levels", use_text=True))

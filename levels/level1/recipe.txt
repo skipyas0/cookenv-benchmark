@@ -1,7 +1,5 @@
-Ingredients: 1, 2, 3, 4
-Appliances: A, B, C
-Goal: 8
-1 -> A = 5 (3)
-2, 5 -> A = 6 (8)
-3, 4 -> B = 7 (5)
-6, 7 -> C = 8 (2)
+Ingredients: 1, 2
+Appliances: A
+Goal: 4
+1 -> A = 3 (3)
+2, 3 -> A = 4 (5)

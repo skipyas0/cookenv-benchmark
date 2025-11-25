@@ -1,15 +1,13 @@
 Items:
-1 = flour
-2 = sugar
-3 = cocoa powder
-4 = butter
-5 = cream
-6 = cake batter
-7 = baked cake
-8 = cooled cake
-9 = frosting
-10 = chocolate cake
+1 = water
+2 = dry spaghetti
+3 = chopped tomatoes
+4 = olive oil
+5 = boiled water
+6 = cooked spaghetti
+7 = tomato sauce
+8 = spaghetti with tomato sauce
 Appliances:
-A = bowl
-B = oven
-C = fridge
+A = cooking pot
+B = pan
+C = bowl
