@@ -62,7 +62,7 @@ def draw_game_info(screen, width, height, tile_size):
     You can use (R) to drop your current item if needed. Your goal is to perform the actions described in the recipe in as little 'game_time' as possible.
     Each move on the board costs 1 'game_time'. If your move is blocked by an impassable object, the player just changes orientation without incrementing 'game_time'.
     Interacting and summoning info does not cost 'game_time'. If you need to pass 'game_time' without moving, (e.g. when waiting for an appliance to finish an operation), use the (Q) to skip time.
-    You can also use (CTRL + S) to go to a level selection menu, (CTRL + G) to give up, or (CTRL + R) to restart the level
+    You can also pres "l" to go to a level selection menu, "k" to give up, or "o" to restart the level
     """)
 
     # Wrap text
