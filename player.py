@@ -178,7 +178,7 @@ class Player:
 				target.add_item(self.inventory)
 				self.inventory=None
 			elif self.inventory != None and target.has_item():
-				T = target.pop_item();
+				T = target.pop_item()
 				target.add_item(self.inventory)
 				self.inventory = T
 			return True
@@ -205,11 +205,11 @@ class Player:
 			except Exception:
 				return False
 
-		# place into appliance
 		if isinstance(target, type) and False:
 			# defensive: should not happen
 			return False
 
+		# place into appliance
 		if target.__class__.__name__ == "Appliance" and self.inventory is not None:
 			try:
 				# limit appliance inventory size to 4

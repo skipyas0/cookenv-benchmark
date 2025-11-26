@@ -224,9 +224,9 @@ class Dispenser(Block):
 			# fallback: return 0 if id not numeric
 			return -1
 		
-	def tick(self) -> None: #¯\_(ツ)_/¯
+	def tick(self, time=1) -> None: #¯\_(ツ)_/¯
 		if self.dispenser_time != -1 and self.elapsed < self.dispenser_time:
-			self.elapsed+=1
+			self.elapsed+=time
 
 
 class Appliance(Block):

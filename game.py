@@ -35,7 +35,7 @@ from states import Level
 from pathlib import Path
 from datetime import datetime
 import asyncio
-from bfs  import *
+from bfs  import pathfind_neighbor_any, Position
 import sys
 import time
 import re
@@ -74,7 +74,7 @@ def level_prompt_txt(levels : list[str]) -> int:
 
 
 
-async def play_levels(start_folder: str | None = None, use_text: bool = True) -> None:
+async def play_levels(start_folder: str | None = None, use_text: bool = True, pathfinding_controls: bool = True) -> None:
 	"""Play all levels starting from the lowest available.
 
 	If start_folder is provided and present in the levels list it will be used
@@ -112,10 +112,7 @@ async def play_levels(start_folder: str | None = None, use_text: bool = True) ->
 
 		t0 = time.time()
 		if use_text:
-			if usePathFindForAi:
-				completed, game_time, choice, info_presses = game.run_text_pathfind()
-			else:
-				completed, game_time, choice, info_presses = game.run_text()
+			completed, game_time, choice, info_presses = game.run_text(pathfinding_controls)
 		else:
 			completed, game_time, choice, info_presses = await game.run_pygame()
 		time_spent = time.time() - t0
@@ -424,9 +421,6 @@ class Game:
 		if sys.platform != "emscripten":
 			pygame.quit()
 		return choice
-
-
-
 
 
 
@@ -812,14 +806,37 @@ class Game:
 			for k, v in agg:
 				print(f"  - {k}: {v}")
 
+	def tick_blocks(self, time):
+		for ry, rrow in enumerate(self.grid):
+			for rx, blk in enumerate(rrow):
+				if isinstance(blk, Appliance):
+					for a in range(time): #TODO: add tick(value)
+						blk.tick()
+						blk.try_start_operations()
+				elif isinstance(blk, Dispenser):
+					for a in range(time): #TODO: add tick(value)
+						blk.tick()
+				
+	def run_text(self, use_pathfinding_control: bool = True):
+		"""Run a simple text-mode loop.
 
+		Commands in normal mode:
+		- up, down, left, right : attempt to move in that direction (orientation sets first)
+		- interact : interact with the tile in front (pick/place)
+		Commands in pathfinfing mode:
+		- interact (x,y) : pathfind to the block at (x,y) and attempt to interact with it (pick/place)
+		Universal commands:
+		- info : print level description and mapping
+		- quit : exit
+		- skip : skip time
+		- drop : empty inventory
 
-	def run_text_pathfind(self):
+		Movement steps advance game time and tick appliances; other commands do not advance time.
+		"""
+		# spawn player similar to run_pygame
 		player = None
 
 		info_press_counter = 0
-
-		interact_patter=r"interact\s*\(\s*(-?\d+)\s*,\s*(-?\d+)\s*\)"
 
 		if getattr(self, "start_pos", None) is not None:
 			x, y = self.start_pos
@@ -842,7 +859,7 @@ class Game:
 		if player is None:
 			raise RuntimeError("No walkable tile found to place the player")
 
-		print("Text-mode controls: interact (x,y), info, skip, quit, restart, give_up, level_skip")
+		print("Text-mode controls: up/down/left/right, interact, info, skip, quit, restart, give_up, level_skip")
 		self.__print_board(player)
 		while True:
 			cmd = input("> ").strip().lower()
@@ -865,60 +882,15 @@ class Game:
 				# pass time without moving
 				player.pass_time()
 				# tick appliances same as on move
-				for ry, rrow in enumerate(self.grid):
-					for rx, blk in enumerate(rrow):
-						if isinstance(blk, Appliance):
-							blk.tick()
-							blk.try_start_operations()
-						elif isinstance(blk, Dispenser):
-							blk.tick()
+				self.tick_blocks(1)
 				self.__print_board(player)
 				continue
+			if cmd == "drop":
+				print(f"Dropped current item: {player.inventory}")
+				player.inventory = None
 
-			m = re.match(interact_patter,cmd)
-			if m: 
-				goal_x = int(m.group(1))
-				goal_y = int(m.group(2))
 
-				if goal_x < 0 or goal_y < 0 or goal_x >= len(self.grid[0]) or goal_y >= len(self.grid):
-					print("The inserted position is outside the boundaries of the level")
-					continue
-				if not (isinstance(self.grid[goal_y][goal_x],Appliance) or isinstance(self.grid[goal_y][goal_x],Dispenser) or isinstance(self.grid[goal_y][goal_x],Table)):
-					print("Invalid position. Only Appliances, Dispensers, and Tables are interactable")
-					continue
-
-				distance_traveled, next_position = pathfind_neighbor_any(self.grid,Position(player.x,player.y),Position(goal_x,goal_y))	
-
-				if distance_traveled == -1:
-					print("Position is unreachable") 
-					continue
-
-				player.game_time += distance_traveled
-				# tick appliances and attempt to start ops
-				for ry, rrow in enumerate(self.grid):
-					for rx, blk in enumerate(rrow):
-						if isinstance(blk, Appliance):
-							for a in range(distance_traveled): #TODO: add tick(value)
-								blk.tick()
-								blk.try_start_operations()
-						elif isinstance(blk, Dispenser):
-							for a in range(distance_traveled): #TODO: add tick(value)
-								blk.tick()
-				
-
-				player.y = next_position.y
-				player.x = next_position.x
-
-				if next_position.x + 1  == goal_x:
-					player.set_orientation("right")
-				elif next_position.x -1  == goal_x:
-					player.set_orientation("left")
-				elif next_position.y + 1  == goal_y:
-					player.set_orientation("down")
-				elif next_position.y - 1  == goal_y:
-					player.set_orientation("up")
-
-				self.__print_board(player)
+			if not use_pathfinding_control and cmd == "interact":
 				changed = player.interact(self.grid)
 				if changed:
 					print("Interaction succeeded")
@@ -950,94 +922,17 @@ class Game:
 				else:
 					print("Nothing happened")
 				continue
-			# movement commands
-			if cmd == "drop":
-				print(f"Dropped current item: {player.inventory}")
-				player.inventory = None
-				continue
-			# unknown command
-			print("Unknown command. Use interact (x,y), info, quit, restart, give_up, level_skip")
-
-	def run_text(self):
-		"""Run a simple text-mode loop.
-
-		Commands:
-		- up, down, left, right : attempt to move in that direction (orientation sets first)
-		- interact : interact with the tile in front (pick/place)
-		- info : print level description and mapping
-		- quit : exit
-
-		Movement steps advance game time and tick appliances; other commands do not advance time.
-		"""
-		# spawn player similar to run_pygame
-		player = None
-
-		info_press_counter = 0
-
-		if getattr(self, "start_pos", None) is not None:
-			x, y = self.start_pos
-			if (
-				0 <= y < len(self.grid)
-				and 0 <= x < len(self.grid[0])
-				and self.grid[y][x].walkable
-			):
-				player = Player(x, y)
-				if getattr(self, "start_orientation", None) is not None:
-					player.orientation = self.start_orientation
-		if player is None:
-			for y, row in enumerate(self.grid):
-				for x, block in enumerate(row):
-					if block.walkable:
-						player = Player(x, y)
-						break
-				if player is not None:
-					break
-		if player is None:
-			raise RuntimeError("No walkable tile found to place the player")
-
-
-		print("Text-mode controls: up/down/left/right, interact, info, skip, quit, restart, give_up, level_skip")
-		self.__print_board(player)
-		while True:
-			cmd = input(" > ").strip().lower()
-			if not cmd:
-				continue
-			if cmd in ("quit", "exit"):
-				print("Exiting")
-				return 0, player.game_time, "exit", info_press_counter
-			if cmd == "info":
-				info_press_counter += 1
-				self.__print_info()
-				continue
-			if cmd == "restart":
-				return 0, player.game_time, "repeat", info_press_counter
-			if cmd == "give_up":
-				return 0, player.game_time, "continue", info_press_counter
-			if cmd == "level_skip":
-				return -1, player.game_time, "level_skip", info_press_counter
-			if cmd == "skip":
-				# pass time without moving
-				player.pass_time()
-				# tick appliances same as on move
-				for ry, rrow in enumerate(self.grid):
-					for rx, blk in enumerate(rrow):
-						if isinstance(blk, Appliance):
-							blk.tick()
-							blk.try_start_operations()
-						elif isinstance(blk, Dispenser):
-							blk.tick()
-				self.__print_board(player)
-				continue
-
-			m = re.match(interact_patter,cmd)
-			if m: 
-				goal_x = int(m.group(1))
-				goal_y = int(m.group(2))
+			
+			interact_patter=r"interact\s*\(\s*(-?\d+)\s*,\s*(-?\d+)\s*\)"
+			nav_cmd = re.match(interact_patter,cmd)
+			if use_pathfinding_control and nav_cmd:
+				goal_x = int(nav_cmd.group(1))
+				goal_y = int(nav_cmd.group(2))
 
 				if goal_x < 0 or goal_y < 0 or goal_x >= len(self.grid[0]) or goal_y >= len(self.grid):
 					print("The inserted position is outside the boundaries of the level")
 					continue
-				if not (isinstance(self.grid[goal_y][goal_x],Appliance) or isinstance(self.grid[goal_y][goal_x],Dispenser) or isinstance(self.grid[goal_y][goal_x],Table)):
+				if not any(isinstance(self.grid[goal_y][goal_x], target) for target in [Dispenser, Appliance, Table]):
 					print("Invalid position. Only Appliances, Dispensers, and Tables are interactable")
 					continue
 
@@ -1048,17 +943,9 @@ class Game:
 					continue
 
 				player.game_time += distance_traveled
+
 				# tick appliances and attempt to start ops
-				for ry, rrow in enumerate(self.grid):
-					for rx, blk in enumerate(rrow):
-						if isinstance(blk, Appliance):
-							for a in range(distance_traveled): #TODO: add tick(value)
-								blk.tick()
-								blk.try_start_operations()
-						elif isinstance(blk, Dispenser):
-							for a in range(distance_traveled): #TODO: add tick(value)
-								blk.tick()
-				
+				self.tick_blocks(distance_traveled)
 
 				player.y = next_position.y
 				player.x = next_position.x
@@ -1074,6 +961,15 @@ class Game:
 
 				self.__print_board(player)
 				changed = player.interact(self.grid)
+				
+				# if interact failed because of ongoing operation, implicitly skip time and try again
+				target = self.grid[goal_y][goal_x]
+				if not changed and isinstance(target, Appliance) and target.remaining_time > 0:
+					print(f"Appliance is busy, skipping {target.remaining_time} game time to interact")
+					player.game_time += self.grid[goal_y][goal_x].remaining_time
+					self.tick_blocks(target.remaining_time)
+					changed = player.interact(self.grid)
+
 				if changed:
 					print("Interaction succeeded")
 					if self.goal is not None and player.inventory == self.goal:
@@ -1084,7 +980,7 @@ class Game:
 						while choice not in ("r", "c", "e"):
 							choice = (
 								input(
-									"Level complete. (r) repeat, (c) continue, (e) exit: > "
+									"Level complete. (r) repeat, (c) continue, (e) exit: "
 								)
 								.strip()
 								.lower()
@@ -1104,12 +1000,10 @@ class Game:
 				else:
 					print("Nothing happened")
 				continue
+
 			# movement commands
-			if cmd == "drop":
-				print(f"Dropped current item: {player.inventory}")
-				player.inventory = None
-				continue
-			if cmd in ("up", "down", "left", "right"):
+			
+			if not use_pathfinding_control and cmd in ("up", "down", "left", "right"):
 				dx = dy = 0
 				if cmd == "up":
 					new_orient = "up"
@@ -1128,25 +1022,21 @@ class Game:
 				moved = player.try_move(dx, dy, self.grid)
 				if moved:
 					# tick appliances and attempt to start ops
-					for ry, rrow in enumerate(self.grid):
-						for rx, blk in enumerate(rrow):
-							if isinstance(blk, Appliance):
-								blk.tick()
-								blk.try_start_operations()
-							elif isinstance(blk, Dispenser):
-								blk.tick()
+					self.tick_blocks(1)
 					self.__print_board(player)
 					if self.goal is not None and player.inventory == self.goal:
 						print(
 							f"Goal achieved: player has item {self.goal} at time {player.game_time}"
 						)
 						choice = None
-						
 						while choice not in ("r", "c", "e"):
-							choice = input(
-								"Level complete. (r) repeat, (c) continue, (e) exit: > "
-							).strip().lower()
-
+							choice = (
+								input(
+									"Level complete. (r) repeat, (c) continue, (e) exit: "
+								)
+								.strip()
+								.lower()
+							)
 							if choice not in ("r", "c", "e"):
 								print("Please choose r, c or e")
 						if choice == "r":
@@ -1158,9 +1048,14 @@ class Game:
 					print("Move blocked or out of bounds")
 				self.__print_board(player)
 				continue
+
+
 			# unknown command
-			print("Unknown command. Use up/down/left/right, interact, info, quit")
+			if use_pathfinding_control:
+				print("Unknown command. Use interact (x, y), info, skip, drop, quit")
+			else:
+				print("Unknown command. Use up/down/left/right, interact, info, skip, drop, quit")
 
 
 if __name__ == "__main__":
-	asyncio.run(play_levels(start_folder="levels", use_text=True))
+	asyncio.run(play_levels(start_folder="levels", use_text=True, pathfinding_controls=True))
