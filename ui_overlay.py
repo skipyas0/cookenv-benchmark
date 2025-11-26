@@ -31,8 +31,8 @@ def draw_game_info(screen, width, height, tile_size):
     screen.blit(over, (0, 0))
 
     try:
-        font = pygame.font.SysFont(None, max(12, tile_size // 4))
-        head_font = pygame.font.SysFont(None, max(18, tile_size // 2), bold=True)
+        font = pygame.font.SysFont(None, max(10, tile_size // 5))
+        head_font = pygame.font.SysFont(None, max(14, tile_size // 3), bold=True)
     except Exception:
         return
 
