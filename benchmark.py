@@ -27,7 +27,7 @@ from textwrap import dedent
 from openai import OpenAI
 
 # accepted commands the game understands in text mode
-VALID_COMMANDS = {"up", "down", "left", "right", "interact", "info", "skip", "quit"}
+VALID_COMMANDS = {"up", "down", "left", "right", "interact", "info"}
 
 SYSTEM_PROMPT = dedent("""\
     You are playing a simple tile-based cooking game. 
@@ -35,15 +35,15 @@ SYSTEM_PROMPT = dedent("""\
     The map is a grid-world consisting of 4 different block types:
     - floor: marked by '.', you can move freely on floor blocks, each move costs you one 'game_time'
     - wall: marked by '#', you can't move through wall blocks
-    - dispenser: marked by a digit 1-9, impassable, you can *interact* with it to acquire an ingredient if your inventory is empty
-    - appliance: marked by a uppercase letter A-E, impassable, you can *interact* with it to either 1. place the contents of your inventory inside or 2. take the contents of the appliance if your inventory is empty
+    - dispenser: marked by a digit 1-9, impassable, when standing besides it you can *interact* with it to acquire an ingredient if your inventory is empty
+    - appliance: marked by a uppercase letter A-E, impassable, when standing besides it you can *interact* with it to either 1. place the contents of your inventory inside or 2. take the contents of the appliance if your inventory is empty
     Furthermore, if an appliance contains a specific combination of ingredients, it performs an 'operation', yielding a novel ingredient after some amount of 'game_time' passes.
     By writing 'info', you can display information about the given task - a textual recipe, a mapping which maps objects in the recipe to block ids on the board, inventory and appliance states.
     Your goal is to perform the actions described in the recipe in as little 'game_time' as possible.
     Each move on the board costs 1 'game_time'. If your move is blocked by an impassable object, the player just changes orientation without incrementing 'game_time'.
     Interacting and summoning info does not cost 'game_time'. If you need to pass 'game_time' without moving, (e.g. when waiting for an appliance to finish an operation), use the 'skip' command.
 
-    The game prints the board and then prompts with '> ' when it wants your next action.
+    The game prints the board and then prompts with ' > ' when it wants your next action.
     You must respond with exactly one of the following commands (lowercase): up, down, left, right, interact, info, skip, quit.
     Do not output any other text or commentary — only the single command followed by a newline.
 """)
@@ -55,10 +55,15 @@ USER_TEMPLATE = dedent("""\
     Choose the single next command.
 """)
 
+LEVEL_COMPLETE_TEMPLATE = dedent("""\
+    Congratulations! You completed the level.
+    You now advance to a new, slightly harder level.
+    Keep playing!
+""")
 
 
 COMMAND_RE = re.compile(
-    r"\b(up|down|left|right|interact|info|skip|quit)\b", re.IGNORECASE
+    r"\b(up|down|left|right|interact|info)\b", re.IGNORECASE
 )
 
 
@@ -84,7 +89,7 @@ def call_llm(
     This uses the ChatCompletion API via the openai client. If you're using
     an OpenRouter-compatible base, set OPENAI_API_BASE to your router URL.
     """
-
+    time.sleep(3)
     resp = client.chat.completions.create(
         model=model, messages=turns, temperature=temperature
     )
@@ -139,7 +144,7 @@ def read_until_prompt(proc, timeout: float = 10.0) -> Optional[str]:
             return "".join(out) if out else None
         buf += ch
         out.append(ch)
-        if buf.endswith("> "):
+        if buf.endswith(" > "):
             return "".join(out)
         if time.time() - start > timeout:
             return "".join(out)
@@ -148,7 +153,7 @@ def read_until_prompt(proc, timeout: float = 10.0) -> Optional[str]:
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument(
-        "--model", type=str, default="openai/gpt-oss-20b", help="Model name to use"
+        "--model", type=str, default="openai/gpt-oss-120b", help="Model name to use"
     )
     parser.add_argument(
         "--max-steps", type=int, default=1000, help="Maximum steps/actions to take"
@@ -162,7 +167,7 @@ def main():
     client = OpenAI(
         base_url="https://openrouter.ai/api/v1"
     )
-    turns = [{"role": "system", "content": SYSTEM_PROMPT}]
+    turns = [{"role": "user" if any(x in args.model for x in ["gemma"]) else "system", "content": SYSTEM_PROMPT}]
 
     steps = 0
     try:
@@ -175,17 +180,35 @@ def main():
             print("--- game output ---")
             print(captured)
             print("--- end of game output ---")
-            turns.append({
-                "role": "user", "content": USER_TEMPLATE.format(game_output=captured)
-            })
+            if "Level complete." in captured:
+                cmd = "c" # select continue for the LLM
+                message = {
+                    "role": "user", "content": LEVEL_COMPLETE_TEMPLATE
+                }
 
-            # Ask LLM for the next command
-            cmd = call_llm(client, args.model, turns)
-            if cmd is None:
-                print("LLM did not return a valid command. Sending 'info' as fallback.")
-                cmd = "info"
-                turns.append({"role": "assistant", "content": f"{cmd}"})
-            print(f"LLM -> {cmd}")
+                print(message)
+                turns.append(message)
+
+            else:
+                message = {
+                    "role": "user", "content": USER_TEMPLATE.format(game_output=captured)
+                }
+
+                print(message)
+                turns.append(message)
+
+                with open("benchmark.log", "w+") as f:
+                    json.dump(turns, f)
+
+                # Ask LLM for the next command
+                #cmd = input("debug input:")
+                cmd = call_llm(client, args.model, turns)
+                if cmd is None:
+                    print("LLM did not return a valid command. Sending 'info' as fallback.")
+                    cmd = "info"
+                    turns.append({"role": "assistant", "content": f"{cmd}"})
+                print(f"LLM -> {cmd}")
+
             # send to game stdin
             try:
                 proc.stdin.write(cmd + "\n")

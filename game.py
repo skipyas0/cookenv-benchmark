@@ -5,6 +5,18 @@ holds a 2D grid of Blocks and can draw it to the console.
 """
 
 from __future__ import annotations
+import os
+import warnings
+
+os.environ['PYGAME_HIDE_SUPPORT_PROMPT'] = "1"
+
+# Filter the specific UserWarning related to pkg_resources in pygame/pkgdata.py
+warnings.filterwarnings(
+	"ignore", 
+	message="pkg_resources is deprecated as an API.*",
+	category=UserWarning,
+	module='pygame' # Target the warning from the pygame module
+)
 
 from typing import List, Sequence
 
@@ -42,7 +54,7 @@ def level_prompt_txt(levels : list[str]) -> int:
 			print(i, end=" ")
 		print()
 
-		cmd = input("> ").strip().lower()
+		cmd = input(" > ").strip().lower()
 		if (cmd == "quit" or cmd == "continue" or cmd == "repeat" or
 		   cmd == "q" or cmd == "c" or cmd == "r"):
 			return cmd
@@ -115,15 +127,15 @@ async def play_levels(start_folder: str | None = None, use_text: bool = True) ->
 		# interpret choice
 		if choice == "level_skip":
 			if use_text:
-				choice = level_prompt_txt(levels);
+				choice = level_prompt_txt(levels)
 				if isinstance(choice, int): #if not, user chose quit|continue|repeat
-					idx = choice;
-					continue;
+					idx = choice
+					continue
 			else:
 				choice = await game.prompt_level(levels)
 				if isinstance(choice, int): #if not, user chose quit|continue|repeat
-					idx = choice;
-					continue;
+					idx = choice
+					continue
 
 		if choice == "repeat" or choice == "r":
 			print(f"Repeating level {lvl_path}")
@@ -826,7 +838,7 @@ class Game:
 		print("Text-mode controls: up/down/left/right, interact, info, skip, quit, restart, give_up, level_skip")
 		print_board()
 		while True:
-			cmd = input("> ").strip().lower()
+			cmd = input(" > ").strip().lower()
 			if not cmd:
 				continue
 			if cmd in ("quit", "exit"):
@@ -867,7 +879,7 @@ class Game:
 						while choice not in ("r", "c", "e"):
 							choice = (
 								input(
-									"Level complete. (r) repeat, (c) continue, (e) exit: "
+									"Level complete. (r) repeat, (c) continue, (e) exit: > "
 								)
 								.strip()
 								.lower()
@@ -923,14 +935,12 @@ class Game:
 							f"Goal achieved: player has item {self.goal} at time {player.game_time}"
 						)
 						choice = None
+						
 						while choice not in ("r", "c", "e"):
-							choice = (
-								input(
-									"Level complete. (r) repeat, (c) continue, (e) exit: "
-								)
-								.strip()
-								.lower()
-							)
+							choice = input(
+								"Level complete. (r) repeat, (c) continue, (e) exit: > "
+							).strip().lower()
+
 							if choice not in ("r", "c", "e"):
 								print("Please choose r, c or e")
 						if choice == "r":
@@ -940,7 +950,7 @@ class Game:
 						return 1, player.game_time, "exit"
 				else:
 					print("Move blocked or out of bounds")
-				print_board()
+					print_board()
 				continue
 			# unknown command
 			print("Unknown command. Use up/down/left/right, interact, info, quit")

@@ -5,3 +5,5 @@ levels/scores-*.txt
 transcript.json
 worker.js
 level_archive
+*.log
+*.json
