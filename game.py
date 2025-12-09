@@ -603,7 +603,7 @@ class Game:
 							for rx, blk in enumerate(rrow):
 								if isinstance(blk, Appliance):
 									blk.tick(self.progress)
-									blk.try_start_operations([player.operation])
+									blk.try_start_operations(player.game_time)
 								elif isinstance(blk, Dispenser):
 									blk.tick()
 					elif event.key == pygame.K_r:
