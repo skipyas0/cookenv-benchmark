@@ -1,7 +1,273 @@
 # ui_overlay.py
+import sys
+import os
+import base64
 import pygame
 from textwrap import dedent
+import re
 
+game_text = dedent("""\
+    <h1>You are playing a simple tile-based cooking game.</h1>
+    <p>The goal is to <b>complete the recipe</b> and get the <b>goal ingredient</b> into your inventory in as few steps (game_time) as possible.
+    <h2><b style='color: #ff6b6b'>Controls</b></h2>
+	Moving <b style='color: #ff6b6b'>(WSAD/Arrows)</b>, Interact <b style='color: #ff6b6b'>(Space)</b>, Pass time <b style='color: #ff6b6b'>(Q)</b>, Information <b style='color: #ff6b6b'>(E)</b>, Discard item <b style='color: #ff6b6b'>(R)</b></b>
+    <h2>Map</h2>
+    <p>
+    The map is a grid-world consisting of 4 different block types:
+    <ul>
+    <li>floor: light, you can move freely on floor blocks, each move costs you one 'game_time'</li>
+    <li>wall: dark, you can't move through wall blocks</li>
+    <li>dispenser: marked by an item image, like <img src="{icon_url}" style="width: 24px; vertical-align: middle; margin-right: 10px;">
+    <li>appliance: marked by an appliance image, like <img src="{app_url}" style="width: 24px; vertical-align: middle; margin-right: 10px;"></li>
+    </ul>
+    </p>
+    <h2>Tips & Hints</h2>
+    <ul>
+    <li>Use <b style='color: #ff6b6b'>E</b> to display info and switch between level and game info (this screen)</li>
+    <li>Read the <b>recipe</b> on the level info screen</li>
+    <li>Walk to a <b>dispenser</b> and use <b style='color: #ff6b6b'>Space</b> to grab an ingredient</li>
+    <li>Your inventory holds only <b>one</b> item. You can see which in the menu at the bottom of the screen
+    <li>Walk to an <b>appliance</b> and use <b style='color: #ff6b6b'>Space</b> to place item in inventory or take the item in the appliance</li>
+    <li>If the <b>appliance</b> has the necessary ingredients (in any order), it performs an <b>operation</b>, which produces a new item after some time</li>
+    <li>If you need to wait for an operation without moving, use <b style='color: #ff6b6b'>Q</b></li>
+    <li>If your inventory is full but you need to grab another item, interact with an <b>appliance</b> multiple times to cycle through items or use <b style='color: #ff6b6b'>R</b> to empty your inventory.</li>
+    </ul>
+    """)
+
+COLOR_BG = "#3C3C3C"
+COLOR_ACCENT = "#7D9598" 
+COLOR_TEXT = "#E0E0E0"
+class BrowserUI:
+    def __init__(self):
+        self.is_web = sys.platform == "emscripten"
+        self.window = None
+        self.document = None
+        self.overlay = None
+        self.game_info = game_text.format(icon_url=get_image_data_url("assets/apple.png"), app_url=get_image_data_url("assets/pan.png"))
+        self.level_info = "<h1>placeholder</h1>"
+        if self.is_web:
+            import platform
+            self.window = platform.window
+            self.document = self.window.document
+            
+            self.overlay = self.document.getElementById("info-overlay")
+            if self.overlay is None:
+                self.overlay = self.document.createElement("div")
+                self.overlay.id = "info-overlay"
+                self.document.body.appendChild(self.overlay)
+                
+                # --- MINIMALIST STYLING ---
+                s = self.overlay.style
+                s.position = "absolute"
+                # Center the div
+                s.top = "50%"
+                s.left = "50%"
+                s.transform = "translate(-50%, -50%)"
+                
+                # Dimensions
+                s.width = "70%"
+                s.maxHeight = "80%"
+                
+                # Colors & Borders
+                s.backgroundColor = "#3C3C3C"       # Dark Gray Background
+                s.border = "2px solid #7D9598"      # Muted Teal Border
+                s.borderRadius = "8px"              # Slight rounding
+                s.boxShadow = "0 4px 15px rgba(0,0,0,0.5)"
+                
+                # Text Styling
+                s.color = "#E0E0E0"                 # Light gray text for readability
+                s.fontFamily = "'Segoe UI', Tahoma, Geneva, Verdana, sans-serif"
+                s.fontSize = "16px"
+                s.lineHeight = "1.6"
+                s.padding = "25px"
+                
+                # Behavior
+                s.display = "none"
+                s.zIndex = "1000"
+                s.overflowY = "auto" # Scroll if content is too long
+
+    def show_html(self, html_content):
+        if self.is_web and self.overlay is not None:
+            self.overlay.innerHTML = html_content
+            self.overlay.style.display = "block"
+        else:
+            print("--- HTML CONTENT ---")
+            print(html_content)
+
+    def hide(self):
+        if self.is_web and self.overlay is not None:
+            self.overlay.style.display = "none"
+
+    def show_game_info(self):
+        html_wrapper = dedent(f"""
+        <div style="font-family: 'Segoe UI', sans-serif; color: {COLOR_TEXT};">
+        
+        <div style="border-bottom: 2px solid {COLOR_ACCENT}; margin-bottom: 15px; padding-bottom: 5px;">
+            <h2 style="margin: 0; font-size: 22px; color: {COLOR_ACCENT};">Game Info</h2>
+            <small style="font-size: 12px; color: #999;">Press 'E' to Close</small>
+        </div>
+
+        <div style="margin-bottom: 20px; line-height: 1.6; font-size: 16px;">
+            {self.game_info}
+        </div>
+        </div>
+        """)
+        self.show_html(html_wrapper)
+
+    def show_level_info(self):
+        self.show_html(self.level_info)
+
+    def update_game_info(self, game_info):
+        self.game_info = game_info
+
+    def update_level_info(self, level):
+        self.level_info = generate_level_html(level)
+
+def get_image_data_url(filepath):
+    """
+    Reads a local file (accessible to Python) and converts it 
+    to a Base64 Data URL string for use in HTML <img> tags.
+    """
+    if not os.path.exists(filepath):
+        print(f"Warning: Image not found at {filepath}")
+        return ""
+        
+    # Determine file extension for the MIME type
+    ext = filepath.split('.')[-1].lower()
+    mime_type = "image/png" if ext == "png" else "image/jpeg"
+    
+    with open(filepath, "rb") as f:
+        # Read the binary data
+        data = f.read()
+        # Encode to base64 string
+        b64_data = base64.b64encode(data).decode('utf-8')
+        
+    return f"data:{mime_type};base64,{b64_data}"
+
+
+
+
+# --- 2. The HTML Generator Function ---
+def generate_level_html(lvl):
+    """
+    Converts level data into a styled HTML string with inline icons.
+    """
+    
+    # Configuration for styling (Minimalist Palette)
+
+    
+    # Helper to create an <img> tag from a name (e.g., "Toaster" -> assets/Toaster.png)
+    def make_icon_tag(name, size=20):
+        # Assumes images are in 'assets/' and match the name in mapping
+        # You might need to lowercase it or add .png depending on your file structure
+        path = f"assets/{name.replace(' ', '_').lower()}.png" 
+        src = get_image_data_url(path)
+        if src:
+            return f'<img src="{src}" style="width:{size}px; height:{size}px; vertical-align:middle; margin: 0 4px;">'
+        return "" # Return empty if image not found
+
+    # --- A. Prepare the Regex Logic (The "Processor") ---
+    mapping = lvl.mapping or {}
+    phrase_map = {v.lower(): v for v in mapping.values()}
+    
+    # Sort phrases by length (descending) for the single-pass greedy match
+    sorted_phrases = sorted(phrase_map.keys(), key=len, reverse=True)
+    
+    # Compile regex once if we have phrases
+    pattern = None
+    if sorted_phrases:
+        pattern_str = r'\b(' + '|'.join(map(re.escape, sorted_phrases)) + r')\b'
+        pattern = re.compile(pattern_str, re.IGNORECASE)
+
+    def inject_icons(text_segment):
+        """Helper to apply the regex replacement to any text string."""
+        if not text_segment or not pattern:
+            return text_segment
+            
+        def replace_match(match):
+            text_found = match.group(0)
+            canonical_name = phrase_map[text_found.lower()]
+            icon = make_icon_tag(canonical_name, size=18) # Icon size matches text
+            return f'<span style="color:{COLOR_ACCENT}; font-weight:bold;">{text_found}</span>{icon}'
+            
+        return pattern.sub(replace_match, text_segment)
+
+    # --- B. Split and Process Description ---
+    raw_desc = (lvl.desc or "").strip()
+    if "#" in raw_desc:
+        raw_desc = raw_desc.split("#")[1].strip()
+
+    # Split first line (Heading) vs Rest (Body)
+    if "\n" in raw_desc:
+        desc_head, desc_body = raw_desc.split("\n", 1)
+    else:
+        desc_head, desc_body = raw_desc, ""
+
+    # 1. Clean HTML safety
+    desc_head = desc_head.strip().replace("<", "&lt;").replace(">", "&gt;")
+    desc_body = desc_body.strip().replace("<", "&lt;").replace(">", "&gt;")
+
+    # 2. Inject Icons into BOTH parts <--- UPDATED HERE
+    desc_head = inject_icons(desc_head)
+    desc_body = inject_icons(desc_body)
+
+    # 3. Format body newlines
+    desc_body = desc_body.replace("\n", "<br>")
+
+    # --- C. Build Columns (Items & Appliances) ---
+    items_html = ""
+    appliances_html = ""
+
+    for k, v in mapping.items():
+        icon = make_icon_tag(v, size=24)
+        entry_html = (
+            f'<div style="margin-bottom: 8px; display: flex; align-items: center;">'
+            f'<span style="color:{COLOR_ACCENT}; font-weight:bold; min-width: 30px;">{k}</span>'
+            f'{icon}'
+            f'<span>{v}</span>'
+            f'</div>'
+        )
+        if k.isdigit():
+            items_html += entry_html
+        elif k.isalpha():
+            appliances_html += entry_html
+
+    # --- C. Assemble Final HTML ---
+    final_html = f"""
+    <div style="font-family: 'Segoe UI', sans-serif; color: {COLOR_TEXT};">
+        
+        <div style="border-bottom: 2px solid {COLOR_ACCENT}; margin-bottom: 15px; padding-bottom: 5px;">
+            <h2 style="margin: 0; font-size: 22px; color: {COLOR_ACCENT};">Level Info</h2>
+            <small style="font-size: 12px; color: #999;">Press 'E' to Close</small>
+        </div>
+
+        <div style="margin-bottom: 20px;">
+            <h3 style="margin: 0 0 10px 0; color: #FFF; font-size: 18px;">
+                {desc_head}
+            </h3>
+            
+            <div style="line-height: 1.6; font-size: 16px; color: #CCC;">
+                {desc_body}
+            </div>
+        </div>
+
+        <div style="display: flex; gap: 20px; background: rgba(0,0,0,0.2); padding: 15px; border-radius: 8px;">
+            
+            <div style="flex: 1;">
+                <h3 style="margin-top: 0; color: {COLOR_ACCENT}; border-bottom: 1px solid #555;">Items</h3>
+                {items_html if items_html else "<i>None</i>"}
+            </div>
+
+            <div style="flex: 1;">
+                <h3 style="margin-top: 0; color: {COLOR_ACCENT}; border-bottom: 1px solid #555;">Appliances</h3>
+                {appliances_html if appliances_html else "<i>None</i>"}
+            </div>
+            
+        </div>
+    </div>
+    """
+    
+    return final_html
 
 def _wrap_text(text, font, max_width):
     """Helper to wrap text into lines fitting into max_width."""
@@ -44,26 +310,7 @@ def draw_game_info(screen, width, height, tile_size):
     screen.blit(head_font.render("Game Info (Press E to EXIT)", True, (245, 245, 245)), (x_pad, y_pad))
     y_cursor = y_pad + head_font.get_height() + 12
 
-    # Game instructions and tips
-    game_text = dedent("""\
-    You are playing a simple tile-based cooking game. 
-	Controls: Moving (WSAD/Arrows), Interact (Space), Pass time (Q), Information (E), Drop item (R)
-    The map is a grid-world consisting of 4 different block types:
-    - floor: light, you can move freely on floor blocks, each move costs you one 'game_time'
-    - wall: dark, you can't move through wall blocks
-    - dispenser: marked by a digit 1-9 (in the bottom left-hand corner of a tile) and coresponding item image.
-    Impassable, you can interact with it using (Space) to acquire an ingredient if your inventory is empty. 
-    Some dispenser have an expiration date (specified in the bottom right-hand corner). If the dispenser expires, you won't be able to acquire additional ingredient (the dispenser shows a cross image)
-    - appliance: marked by an uppercase letter A-E (in the bottom left-hand corner of the tile) and coresponding item image.  
-    Impassable, you can interact with it using (Space) to either 1. place the contents of your inventory inside or 2. take the contents of the appliance if your inventory is empty
     
-	If an appliance contains a specific combination of ingredients, it performs an 'operation', yielding a novel ingredient after some amount of 'game_time' passes.
-    By using (E), you can display information about the given task - a textual recipe, a mapping which maps objects in the recipe to block ids on the board, inventory and appliance states.
-    You can use (R) to drop your current item if needed. Your goal is to perform the actions described in the recipe in as little 'game_time' as possible.
-    Each move on the board costs 1 'game_time'. If your move is blocked by an impassable object, the player just changes orientation without incrementing 'game_time'.
-    Interacting and summoning info does not cost 'game_time'. If you need to pass 'game_time' without moving, (e.g. when waiting for an appliance to finish an operation), use the (Q) to skip time.
-    You can also pres "l" to go to a level selection menu, "k" to give up, or "o" to restart the level
-    """)
 
     # Wrap text
     lines = []

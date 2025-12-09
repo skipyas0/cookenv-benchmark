@@ -50,7 +50,7 @@ class Level:
     goal: Optional[int]
     start_pos: tuple[int, int] | None = None
     start_orientation: str | None = None
-
+    
     @classmethod
     def load_from_folder(cls, folder: str | Path) -> "Level":
         p = Path(folder)
@@ -150,3 +150,15 @@ class Level:
                     
 
         return cls(path=p, desc=desc, mapping=mapping, maze_lines=maze_lines, operations=ops, goal=goal, start_pos=start_pos, start_orientation=start_orientation)
+
+    def html_info(self) -> str:
+        """
+        Outputs str containing info about the current level (appliances, dispensers, recipe...)
+        """
+        s = self.desc.split('\n')
+        title = s[0]
+        rest_desc = '\n'.join(s[1:]) 
+
+        
+
+        return f"<h1>{title}</h1><p>{rest_desc}<p>"

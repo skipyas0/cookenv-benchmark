@@ -39,13 +39,12 @@ from bfs  import pathfind_neighbor_any, Position
 import sys
 import time
 import re
-from ui_overlay import draw_game_info, draw_level_info
+from ui_overlay import draw_game_info, draw_level_info, BrowserUI, game_text, get_image_data_url
 from game_utils import send_score, list_levels_dir, prompt_username_pygame, _load_appliance_colors, _load_asset
 
 if sys.platform == "emscripten":
 	import js
 
-usePathFindForAi : bool = False;
 
 
 def level_prompt_txt(levels : list[str]) -> int:
@@ -437,7 +436,7 @@ class Game:
 		"""
 		if not _PYGAME_AVAILABLE:
 			raise RuntimeError("pygame is not available in this environment")
-
+		ui = BrowserUI()
 		pygame.init()
 
 		rows = len(self.grid)
@@ -502,11 +501,13 @@ class Game:
 
 		running = True
 		clock = pygame.time.Clock()
-		show_game_info = True
-		show_level_info = False
+		show_info = 1
 		# end-of-level state
 		level_completed = False
 		end_choice = None  # 'repeat', 'continue', 'exit'
+		ui.update_level_info(self.level)
+		ui.show_game_info()
+
 		while running:
 			for event in pygame.event.get():
 				if event.type == pygame.QUIT:
@@ -531,21 +532,19 @@ class Game:
 						return -1, player.game_time, "level_skip", info_press_counter
 
 					# toggle info screen with 'E'
-					if event.key == pygame.K_e:
-						if not show_game_info and not show_level_info:
-							info_press_counter += 1
-							show_game_info = True
-						elif show_game_info:
-							show_game_info = False
-							show_level_info = True
-						else:
-							show_level_info = False
-							
-						continue
-					# when info screen is shown, ignore other key inputs
-					if show_game_info or show_level_info:
-						continue
+					
 
+					if event.key == pygame.K_e:
+						show_info = (show_info + 1) % 3	
+							
+					if show_info == 1:
+						ui.show_game_info()
+						continue
+					elif show_info == 2:
+						ui.show_level_info()
+						continue
+					else:
+						ui.hide()
 					# map keys to orientation and movement deltas, then delegate to Player
 					dx = dy = 0
 					new_orientation = player.orientation
@@ -672,13 +671,13 @@ class Game:
 				pass
 
 			# if info screen is toggled, draw it over the entire area and skip drawing the player
-			if show_game_info:
-				draw_game_info(screen, width, height, tile_size)
-			elif show_level_info and getattr(self, "level", None) is not None:
-				draw_level_info(screen, width, height, tile_size, self.level, _load_appliance_colors)
-			else:
+			#if show_game_info:
+			#	draw_game_info(screen, width, height, tile_size)
+			#elif show_level_info and getattr(self, "level", None) is not None:
+			#	draw_level_info(screen, width, height, tile_size, self.level, _load_appliance_colors)
+			#else:
 				# draw player via Player.draw (tiles area only)
-				player.draw(screen, tile_size)
+			player.draw(screen, tile_size)
 			pygame.display.flip()
 			clock.tick(30)
 			await asyncio.sleep(0)

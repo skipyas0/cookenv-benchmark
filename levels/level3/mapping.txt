@@ -13,3 +13,4 @@ Appliances:
 A = bowl
 B = oven
 C = fridge
+D = cutting board
