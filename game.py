@@ -45,7 +45,7 @@ from game_utils import send_score, list_levels_dir, prompt_username_pygame, _loa
 if sys.platform == "emscripten":
 	import js
 
-
+DEBUG = False
 
 def level_prompt_txt(levels : list[str]) -> int:
 
@@ -518,22 +518,23 @@ class Game:
 					running = False
 				elif event.type == pygame.KEYDOWN:
 
-					#give_up
-					if event.key == pygame.K_k:
-						if sys.platform != "emscripten":
-							pygame.quit()
-						return 0, player.game_time, "continue", info_press_counter, self.progress
-					#restart
-					if event.key == pygame.K_o:
-						if sys.platform != "emscripten":
-							pygame.quit()
-						return 0, player.game_time, "repeat", info_press_counter, self.progress
-					
-					#level_skip :)
-					if event.key == pygame.K_l:
-						if sys.platform != "emscripten":
-							pygame.quit()
-						return -1, player.game_time, "level_skip", info_press_counter, self.progress
+					if DEBUG:
+						#give_up
+						if event.key == pygame.K_k:
+							if sys.platform != "emscripten":
+								pygame.quit()
+							return 0, player.game_time, "continue", info_press_counter, self.progress
+						#restart
+						if event.key == pygame.K_o:
+							if sys.platform != "emscripten":
+								pygame.quit()
+							return 0, player.game_time, "repeat", info_press_counter, self.progress
+						
+						#level_skip :)
+						if event.key == pygame.K_l:
+							if sys.platform != "emscripten":
+								pygame.quit()
+							return -1, player.game_time, "level_skip", info_press_counter, self.progress
 
 					# toggle info screen with 'E'
 					
@@ -703,18 +704,20 @@ class Game:
 						end_choice = "exit"
 						break
 					if event.type == pygame.KEYDOWN:
-						if event.key in (pygame.K_r,):
-							end_choice = "repeat"
-							choosing = False
-							break
+						if DEBUG:
+							if event.key in (pygame.K_r,):
+								end_choice = "repeat"
+								choosing = False
+								break
+							if event.key in (pygame.K_e, pygame.K_ESCAPE):
+								end_choice = "exit"
+								choosing = False
+								break
 						if event.key in (pygame.K_c,):
 							end_choice = "continue"
 							choosing = False
 							break
-						if event.key in (pygame.K_e, pygame.K_ESCAPE):
-							end_choice = "exit"
-							choosing = False
-							break
+						
 				# render a simple dialog
 				surf = pygame.Surface((width, height), pygame.SRCALPHA)
 				surf.fill((0, 0, 0, 180))
@@ -726,7 +729,7 @@ class Game:
 				if font is not None:
 					lines = [
 						f"Level complete! Time: {player.game_time}",
-						"(R) Repeat level  (C) Continue to next  (E) Exit",
+						"Press (C) to Continue",
 					]
 					for i, L in enumerate(lines):
 						surf_t = font.render(L, True, (240, 240, 240))

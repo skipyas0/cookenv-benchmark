@@ -492,7 +492,7 @@ def generate_end_html(form_url):
         <div style="margin-bottom: 25px; line-height: 1.6;">
             <p>You have successfully completed the tasks.</p> 
             <p>Your data is valuable to us. Please ensure you fill out the final survey below to record your participation.</p>
-            <p style="color: {COLOR_ACCENT}><b>Thank you for participating!</b></p> 
+            <p>Thank you for participating!</p> 
         </div>
 
         <div style="background: rgba(125, 149, 152, 0.1); padding: 20px; border-radius: 8px; border: 1px dashed {COLOR_ACCENT}; margin-bottom: 30px;">
