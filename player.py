@@ -224,9 +224,9 @@ class Player:
 				print(f"placed item {self.inventory} into appliance at ({tx},{ty})")
 				# after placing, attempt to start an operation if possible
 				try:
-					target.try_start_operations()  # type: ignore[attr-defined]
-				except Exception:
-					pass
+					target.try_start_operations(self.game_time)  # type: ignore[attr-defined]
+				except Exception as e:
+					print(f"Warning: try start operation produced {e}")
 				self.inventory = None
 				return True
 			except Exception:

@@ -247,6 +247,7 @@ class Appliance(Block):
 		# operation handling
 		self.operations: List[Operation] = []
 		# remaining blocked time in game steps (0 == not blocked)
+		self.op_start_time = None
 		self.remaining_time: int = 0
 		# currently active operation (None when idle)
 		self.active_operation: Operation | None = None
@@ -373,7 +374,7 @@ class Appliance(Block):
 	def is_blocked(self) -> bool:
 		return self.remaining_time > 0
 
-	def tick(self) -> None:
+	def tick(self, progress_tracker) -> None:
 		"""Advance the appliance by one game step; decrement remaining_time."""
 		if self.remaining_time > 0:
 			self.remaining_time -= 1
@@ -381,10 +382,15 @@ class Appliance(Block):
 			if self.remaining_time == 0 and self.active_operation is not None:
 				# place the product into contents
 				self.contents = [self.active_operation.product]
+				finish_time = self.op_start_time + self.active_operation.time 
+				if self.active_operation.product is not None and progress_tracker[self.active_operation.product-1] == -1:
+					progress_tracker[self.active_operation.product-1] = finish_time
 				print(f"appliance {self.id} finished operation -> product {self.active_operation.product}")
 				self.active_operation = None
+				self.op_start_time = None
+				self.try_start_operations(finish_time)
 
-	def try_start_operations(self) -> bool:
+	def try_start_operations(self, start_time) -> bool:
 		"""If the appliance inventory exactly matches any operation's ingredients,
 		start that operation: remove ingredients, set remaining_time, and place product.
 		Returns True if an operation was started.
@@ -399,9 +405,10 @@ class Appliance(Block):
 				# start operation: remove ingredients and set active operation; product placed when finished
 				self.active_operation = op
 				self.remaining_time = op.time
+				self.op_start_time = start_time
 				# remove ingredients from visible contents
 				self.contents = []
-				print(f"appliance {self.id} started operation -> will produce {op.product} in {op.time} steps")
+				print(f"appliance {self.id} started operation at time {start_time} -> will produce {op.product} in {op.time} steps")
 				return True
 		return False
 	

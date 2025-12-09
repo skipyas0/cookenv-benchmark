@@ -111,20 +111,20 @@ async def play_levels(start_folder: str | None = None, use_text: bool = True, pa
 
 		t0 = time.time()
 		if use_text:
-			completed, game_time, choice, info_presses = game.run_text(pathfinding_controls)
+			completed, game_time, choice, info_presses, progress = game.run_text(pathfinding_controls)
 		else:
-			completed, game_time, choice, info_presses = await game.run_pygame()
+			completed, game_time, choice, info_presses, progress = await game.run_pygame()
 		time_spent = time.time() - t0
 
 		if completed != -1: #skip
 			if sys.platform == "emscripten":
 				await send_score(
-					username, lvl.path, game_time if completed else -1, info_presses, time_spent
+					username, lvl.path, game_time if completed else -1, info_presses, time_spent, progress
 				)
 				await asyncio.sleep(0)
 			else:
 				with open(score_file, "a+") as f:
-					f.write(f"{username}, {lvl.path}, {game_time if completed else -1}, {info_presses}, {time_spent}")
+					f.write(f"{username}, {lvl.path}, {game_time if completed else -1}, {info_presses}, {time_spent}, {progress}")
 				 
 		# interpret choice
 		if choice == "level_skip":
@@ -180,7 +180,8 @@ class Game:
 			self.distribute_operations()
 		# optional goal item id; game ends when player.inventory == goal
 		self.goal = goal
-
+		# keep track of first time that player gets an item
+		self.progress = [-1] * self.goal 
 		# optional player start position (set by from_level)
 		self.start_pos: tuple[int, int] | None = None
 		self.start_orientation: str | None = None
@@ -275,13 +276,13 @@ class Game:
 					# fallback: digits -> Dispenser, letters -> Appliance
 					if ch.isdigit():
 						name=object_mapping.get(ch)
-						if(name== None):
+						if(name is None):
 							obj = Dispenser(ch)
 						else:
 							obj = Dispenser(ch,name)
 					elif ch.isalpha():
 						name=object_mapping.get(ch)
-						if(name== None):
+						if(name is None):
 							obj = Appliance(ch)
 						else:
 							obj = Appliance(ch,name)
@@ -518,18 +519,18 @@ class Game:
 					if event.key == pygame.K_k:
 						if sys.platform != "emscripten":
 							pygame.quit()
-						return 0, player.game_time, "continue", info_press_counter
+						return 0, player.game_time, "continue", info_press_counter, self.progress
 					#restart
 					if event.key == pygame.K_o:
 						if sys.platform != "emscripten":
 							pygame.quit()
-						return 0, player.game_time, "repeat", info_press_counter
+						return 0, player.game_time, "repeat", info_press_counter, self.progress
 					
 					#level_skip :)
 					if event.key == pygame.K_l:
 						if sys.platform != "emscripten":
 							pygame.quit()
-						return -1, player.game_time, "level_skip", info_press_counter
+						return -1, player.game_time, "level_skip", info_press_counter, self.progress
 
 					# toggle info screen with 'E'
 					
@@ -574,13 +575,19 @@ class Game:
 									if isinstance(blk, Appliance):
 										blk.tick()
 										# after ticking, attempt to start any eligible op
-										blk.try_start_operations()
+										blk.try_start_operations(player.game_time)
 									elif isinstance(blk, Dispenser):
 										blk.tick()
 
 					elif event.key == pygame.K_SPACE:
 						# interact with the tile in front
 						player.interact(self.grid)
+
+						# mark item time if not yet found
+						if player.inventory is not None and self.progress[player.inventory-1] == -1:
+							self.progress[player.inventory-1] = player.game_time
+
+
 						# check goal achievement
 						if self.goal is not None and player.inventory == self.goal:
 							print(
@@ -596,7 +603,7 @@ class Game:
 							for rx, blk in enumerate(rrow):
 								if isinstance(blk, Appliance):
 									blk.tick()
-									blk.try_start_operations()
+									blk.try_start_operations([player.operation])
 								elif isinstance(blk, Dispenser):
 									blk.tick()
 					elif event.key == pygame.K_r:
@@ -733,11 +740,11 @@ class Game:
 			# only call pygame.quit() on native platforms; pygbag manages lifecycle in the browser
 			if sys.platform != "emscripten":
 				pygame.quit()
-			return 1, player.game_time, end_choice, info_press_counter
+			return 1, player.game_time, end_choice, info_press_counter, self.progress
 		else:
 			if sys.platform != "emscripten":
 				pygame.quit()
-			return 1, player.game_time, None, info_press_counter
+			return 1, player.game_time, None, info_press_counter, self.progress
 
 	def __print_board(self,player : Player):
 		print(self.draw(player))
@@ -808,12 +815,10 @@ class Game:
 	def tick_blocks(self, time):
 		for ry, rrow in enumerate(self.grid):
 			for rx, blk in enumerate(rrow):
-				if isinstance(blk, Appliance):
-					for a in range(time): #TODO: add tick(value)
-						blk.tick()
-						blk.try_start_operations()
-				elif isinstance(blk, Dispenser):
-					for a in range(time): #TODO: add tick(value)
+				for a in range(time):
+					if isinstance(blk, Appliance):
+						blk.tick(self.progress)
+					elif isinstance(blk, Dispenser):
 						blk.tick()
 				
 	def run_text(self, use_pathfinding_control: bool = True):
@@ -866,17 +871,17 @@ class Game:
 				continue
 			if cmd in ("quit", "exit"):
 				print("Exiting")
-				return 0, player.game_time, "exit", info_press_counter
+				return 0, player.game_time, "exit", info_press_counter, self.progress
 			if cmd == "info":
 				info_press_counter += 1
 				self.__print_info()
 				continue
 			if cmd == "restart":
-				return 0, player.game_time, "repeat", info_press_counter
+				return 0, player.game_time, "repeat", info_press_counter, self.progress
 			if cmd == "give_up":
-				return 0, player.game_time, "continue", info_press_counter
+				return 0, player.game_time, "continue", info_press_counter, self.progress
 			if cmd == "level_skip":
-				return -1, player.game_time, "level_skip", info_press_counter
+				return -1, player.game_time, "level_skip", info_press_counter, self.progress
 			if cmd == "skip":
 				# pass time without moving
 				player.pass_time()
@@ -909,15 +914,16 @@ class Game:
 							if choice not in ("r", "c", "e"):
 								print("Please choose r, c or e")
 						if choice == "r":
-							return 1, player.game_time, "repeat", info_press_counter
+							return 1, player.game_time, "repeat", info_press_counter, self.progress
 						if choice == "c":
 							return (
 								1,
 								player.game_time,
 								"continue",
 								info_press_counter,
+								self.progress
 							)
-						return 1, player.game_time, "exit", info_press_counter
+						return 1, player.game_time, "exit", info_press_counter, self.progress
 				else:
 					print("Nothing happened")
 				continue
@@ -958,9 +964,11 @@ class Game:
 				elif next_position.y - 1  == goal_y:
 					player.set_orientation("up")
 
-				self.__print_board(player)
 				changed = player.interact(self.grid)
-				
+				# mark item time if not yet found
+				if player.inventory is not None and self.progress[player.inventory-1] == -1:
+					self.progress[player.inventory-1] = player.game_time
+
 				# if interact failed because of ongoing operation, implicitly skip time and try again
 				target = self.grid[goal_y][goal_x]
 				if not changed and isinstance(target, Appliance) and target.remaining_time > 0:
@@ -987,17 +995,18 @@ class Game:
 							if choice not in ("r", "c", "e"):
 								print("Please choose r, c or e")
 						if choice == "r":
-							return 1, player.game_time, "repeat", info_press_counter
+							return 1, player.game_time, "repeat", info_press_counter, self.progress
 						if choice == "c":
 							return (
 								1,
 								player.game_time,
 								"continue",
-								info_press_counter,
+								info_press_counter, self.progress
 							)
-						return 1, player.game_time, "exit", info_press_counter
+						return 1, player.game_time, "exit", info_press_counter, self.progress
 				else:
 					print("Nothing happened")
+				self.__print_board(player)
 				continue
 
 			# movement commands
@@ -1022,7 +1031,6 @@ class Game:
 				if moved:
 					# tick appliances and attempt to start ops
 					self.tick_blocks(1)
-					self.__print_board(player)
 					if self.goal is not None and player.inventory == self.goal:
 						print(
 							f"Goal achieved: player has item {self.goal} at time {player.game_time}"
@@ -1039,10 +1047,10 @@ class Game:
 							if choice not in ("r", "c", "e"):
 								print("Please choose r, c or e")
 						if choice == "r":
-							return 1, player.game_time, "repeat"
+							return 1, player.game_time, "repeat", info_press_counter, self.progress
 						if choice == "c":
-							return 1, player.game_time, "continue"
-						return 1, player.game_time, "exit"
+							return 1, player.game_time, "continue", info_press_counter, self.progress
+						return 1, player.game_time, "exit", info_press_counter, self.progress
 				else:
 					print("Move blocked or out of bounds")
 				self.__print_board(player)

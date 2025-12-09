@@ -20,15 +20,18 @@ game_text = dedent("""\
     <li>dispenser: marked by an item image, like <img src="{icon_url}" style="width: 24px; vertical-align: middle; margin-right: 10px;">
     <li>appliance: marked by an appliance image, like <img src="{app_url}" style="width: 24px; vertical-align: middle; margin-right: 10px;"></li>
     </ul>
+    You can <b style='color: #7D9598'>interact</b> with appliances and dispensers by standing next to them and pressing <b style='color: #ff6b6b'>Space</b> while looking at them.
     </p>
     <h2>Tips & Hints</h2>
     <ul>
     <li>Use <b style='color: #ff6b6b'>E</b> to display info and switch between level and game info (this screen)</li>
     <li>Read the <b style='color: #7D9598'>recipe</b> on the level info screen</li>
+    <li>Try to complete the <b style='color: #7D9598'>recipe</b> in as little <b style='color: #7D9598'>'game_time'</b> as possible</li>
+    <li>Only moving and passing time increases <b style='color: #7D9598'>'game_time'</b>, interacting, discarding, turning around (by moving into an adjacent wall), and toggling info does not.</li>
     <li>Walk to a <b style='color: #7D9598'>dispenser</b> and use <b style='color: #ff6b6b'>Space</b> to grab an ingredient</li>
     <li>Your inventory holds only <b style='color: #7D9598'>one</b> item. You can see which in the menu at the bottom of the screen
     <li>Walk to an <b style='color: #7D9598'>appliance</b> and use <b style='color: #ff6b6b'>Space</b> to place item in inventory or take the item in the appliance</li>
-    <li>If the <b style='color: #7D9598'>appliance</b> has the necessary ingredients (in any order), it performs an <b style='color: #7D9598'>operation</b>, which produces a new item after some time</li>
+    <li>If the <b style='color: #7D9598'>appliance</b> has the necessary ingredients (in any order), it starts an <b style='color: #7D9598'>operation</b>, which produces a new item after some time</li>
     <li>If you need to wait for an operation without moving, use <b style='color: #ff6b6b'>Q</b></li>
     <li>If your inventory is full but you need to grab another item, interact with an <b style='color: #7D9598'>appliance</b> multiple times to cycle through items or use <b style='color: #ff6b6b'>R</b> to empty your inventory.</li>
     </ul>
@@ -37,6 +40,7 @@ game_text = dedent("""\
 COLOR_BG = "#3C3C3C"
 COLOR_ACCENT = "#7D9598" 
 COLOR_TEXT = "#E0E0E0"
+
 class BrowserUI:
     def __init__(self):
         self.is_web = sys.platform == "emscripten"
