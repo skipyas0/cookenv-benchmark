@@ -200,12 +200,13 @@ class Dispenser(Block):
 
 		#show exp time
 		font = pygame.font.SysFont(None, max(3, tile_size // 5))
-		txt= "inf" if self.dispenser_time==-1 else f"{self.elapsed}/{self.dispenser_time}";
-		surf = font.render(txt, True, (255,255,255))
-		sw, sh = surf.get_size()
-		sx = x * tile_size + (tile_size - sw) // 1.2
-		sy = y * tile_size + (tile_size - sh) // 1.1
-		surface.blit(surf, (sx, sy))
+		if self.dispenser_time != -1:
+			txt= f"{self.elapsed}/{self.dispenser_time}"
+			surf = font.render(txt, True, (255,255,255))
+			sw, sh = surf.get_size()
+			sx = x * tile_size + (tile_size - sw) // 1.2
+			sy = y * tile_size + (tile_size - sh) // 1.1
+			surface.blit(surf, (sx, sy))
 
 
 

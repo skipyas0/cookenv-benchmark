@@ -156,8 +156,6 @@ async def play_levels(start_folder: str | None = None, use_text: bool = True, pa
 		break
 	if not use_text:
 		ui.show_html(generate_end_html("https://docs.google.com/forms/d/e/1FAIpQLSeKPSA57O5TPji9npJsVBbHbODVpX5AX440SCUmS3NkRAXXXQ/viewform?usp=dialog"))
-
-
 class Game:
 	"""Container for a grid of Block instances.
 
