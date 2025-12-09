@@ -8,7 +8,7 @@ import re
 
 game_text = dedent("""\
     <h1>You are playing a simple tile-based cooking game.</h1>
-    <p>The goal is to <b>complete the recipe</b> and get the <b>goal ingredient</b> into your inventory in as few steps (game_time) as possible.
+    <p>The goal is to <b style='color: #7D9598'>complete the recipe</b> and get the <b style='color: #7D9598'>goal ingredient</b> into your inventory in as <b style='color: #7D9598'>few steps</b> (game_time) as possible.
     <h2><b style='color: #ff6b6b'>Controls</b></h2>
 	Moving <b style='color: #ff6b6b'>(WSAD/Arrows)</b>, Interact <b style='color: #ff6b6b'>(Space)</b>, Pass time <b style='color: #ff6b6b'>(Q)</b>, Information <b style='color: #ff6b6b'>(E)</b>, Discard item <b style='color: #ff6b6b'>(R)</b></b>
     <h2>Map</h2>
@@ -24,13 +24,13 @@ game_text = dedent("""\
     <h2>Tips & Hints</h2>
     <ul>
     <li>Use <b style='color: #ff6b6b'>E</b> to display info and switch between level and game info (this screen)</li>
-    <li>Read the <b>recipe</b> on the level info screen</li>
-    <li>Walk to a <b>dispenser</b> and use <b style='color: #ff6b6b'>Space</b> to grab an ingredient</li>
-    <li>Your inventory holds only <b>one</b> item. You can see which in the menu at the bottom of the screen
-    <li>Walk to an <b>appliance</b> and use <b style='color: #ff6b6b'>Space</b> to place item in inventory or take the item in the appliance</li>
-    <li>If the <b>appliance</b> has the necessary ingredients (in any order), it performs an <b>operation</b>, which produces a new item after some time</li>
+    <li>Read the <b style='color: #7D9598'>recipe</b> on the level info screen</li>
+    <li>Walk to a <b style='color: #7D9598'>dispenser</b> and use <b style='color: #ff6b6b'>Space</b> to grab an ingredient</li>
+    <li>Your inventory holds only <b style='color: #7D9598'>one</b> item. You can see which in the menu at the bottom of the screen
+    <li>Walk to an <b style='color: #7D9598'>appliance</b> and use <b style='color: #ff6b6b'>Space</b> to place item in inventory or take the item in the appliance</li>
+    <li>If the <b style='color: #7D9598'>appliance</b> has the necessary ingredients (in any order), it performs an <b style='color: #7D9598'>operation</b>, which produces a new item after some time</li>
     <li>If you need to wait for an operation without moving, use <b style='color: #ff6b6b'>Q</b></li>
-    <li>If your inventory is full but you need to grab another item, interact with an <b>appliance</b> multiple times to cycle through items or use <b style='color: #ff6b6b'>R</b> to empty your inventory.</li>
+    <li>If your inventory is full but you need to grab another item, interact with an <b style='color: #7D9598'>appliance</b> multiple times to cycle through items or use <b style='color: #ff6b6b'>R</b> to empty your inventory.</li>
     </ul>
     """)
 
