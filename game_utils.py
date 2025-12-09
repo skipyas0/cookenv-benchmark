@@ -14,7 +14,7 @@ except Exception:
 if sys.platform == "emscripten":
 	import js
     
-async def send_score(username, level, game_time, info_presses, time_spent):
+async def send_score(username, level, game_time, info_presses, time_spent, progress):
 	"""Send a score to the configured Google Apps Script endpoint.
 
 	This function awaits the JS fetch Promise so it doesn't start a
@@ -22,7 +22,7 @@ async def send_score(username, level, game_time, info_presses, time_spent):
 	It is defensive and catches exceptions so network errors don't stop play.
 	"""
 	time_stamp = datetime.utcnow().isoformat()
-	sheets_link = "https://script.google.com/macros/s/AKfycby9VqXkvxME3J2WlFa6nVfR8Sj4NgtRujfYBgUJjxlBCUI-GOYalnK5TgB8en2If4_k/exec"
+	sheets_link = "https://script.google.com/macros/s/AKfycbydks0BiYU_ljgyXnlBTUsk4RGgtbW74bP5kjxQKH8JXXBY8z8DJARRydK9mIN3r9Nw/exec"
 	payload = {
 		"username": username,
 		"level": str(level),
@@ -30,6 +30,7 @@ async def send_score(username, level, game_time, info_presses, time_spent):
 		"infopresses": info_presses,
 		"timespent": time_spent,
 		"time": time_stamp,
+		"progress": progress
 	}
 	#print(payload)
 	
