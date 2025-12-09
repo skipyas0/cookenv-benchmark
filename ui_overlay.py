@@ -406,3 +406,118 @@ def draw_level_info(screen, width, height, tile_size, level, _load_appliance_col
             line = f"• {k}: {v}"
             screen.blit(info_font.render(line, True, text_color), (right_x2 + 6, y_m))
             y_m += info_font.get_height() + 6
+
+
+def generate_welcome_html(form_url):
+    """
+    Generates the HTML for the start of the experiment.
+    Includes a link to the Pre-Game form and a button to start.
+    """
+    
+    # Configuration
+    COLOR_ACCENT = "#7D9598"
+    COLOR_TEXT = "#E0E0E0"
+    COLOR_BTN_TEXT = "#1a1a1a" # Dark text for contrast on teal button
+
+    html = f"""
+    <div style="font-family: 'Segoe UI', sans-serif; color: {COLOR_TEXT}; text-align: center;">
+        
+        <h1 style="color: {COLOR_ACCENT}; margin-bottom: 10px;">Welcome</h1>
+        <div style="border-bottom: 2px solid {COLOR_ACCENT}; width: 50%; margin: 0 auto 20px auto;"></div>
+
+        <div style="text-align: left; margin-bottom: 25px; line-height: 1.6; background: rgba(0,0,0,0.2); padding: 15px; border-radius: 8px;">
+            <p style="margin-top: 0;">Thank you for participating in this experiment.</p>
+            <ul style="padding-left: 20px; margin-bottom: 0;">
+                <li>The goal in this game is to cook a recipe in as few game steps as possible, this is the only performance metric.</li>
+                <li>Once the game starts, you see information about the game controls and rules.</li>
+                <li>In the game, you can press <b>E</b> to bring back the info screen at any time.</li>
+            </ul>
+            
+            <p style="margin-top: 0;"><b>This experiment has three rules</b></p>
+            <ul style="padding-left: 20px; margin-bottom: 0;">
+                <li>Only use your head to plan, don't plan on paper.</li>
+                <li>Use the same username in both questionnaires and in the game.</li>
+                <li>Try your best and complete all 4 levels (this should take 5-10 minutes).</li>
+            </ul>
+
+            <p style="margin-top: 0;">Thank you and we hope you will enjoy this at least a little bit ;).<p>
+        </div>
+
+        <div style="margin-bottom: 30px;">
+            <a href="{form_url}" target="_blank" 
+               style="color: #FFF; font-weight: bold; text-decoration: underline; font-size: 18px;">
+               Open Pre-Game Form &raquo;
+            </a>
+        </div>
+
+        <button onclick="document.getElementById('info-overlay').style.display='none'" 
+            style="
+                background-color: {COLOR_ACCENT}; 
+                color: {COLOR_BTN_TEXT};
+                border: none; 
+                padding: 12px 30px; 
+                font-size: 18px; 
+                font-weight: bold; 
+                border-radius: 5px; 
+                cursor: pointer;
+                transition: transform 0.1s;
+                box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+            "
+            onmouseover="this.style.transform='scale(1.05)'"
+            onmouseout="this.style.transform='scale(1)'"
+        >
+            I'm Ready - Start Game
+        </button>
+
+    </div>
+    """
+    return html
+
+def generate_end_html(form_url):
+    """
+    Generates the HTML for the end of the experiment.
+    Includes a link to the Post-Game form and a Close button.
+    """
+    
+    COLOR_ACCENT = "#7D9598"
+    COLOR_TEXT = "#E0E0E0"
+    COLOR_BTN_TEXT = "#1a1a1a"
+
+    html = f"""
+    <div style="font-family: 'Segoe UI', sans-serif; color: {COLOR_TEXT}; text-align: center;">
+        
+        <h1 style="color: {COLOR_ACCENT}; margin-bottom: 10px;">Experiment Complete</h1>
+        <div style="border-bottom: 2px solid {COLOR_ACCENT}; width: 50%; margin: 0 auto 20px auto;"></div>
+
+        <div style="margin-bottom: 25px; line-height: 1.6;">
+            <p>You have successfully completed the tasks.</p> 
+            <p>Your data is valuable to us. Please ensure you fill out the final survey below to record your participation.</p>
+            <p style="color: {COLOR_ACCENT}><b>Thank you for participating!</b></p> 
+        </div>
+
+        <div style="background: rgba(125, 149, 152, 0.1); padding: 20px; border-radius: 8px; border: 1px dashed {COLOR_ACCENT}; margin-bottom: 30px;">
+            <a href="{form_url}" target="_blank" 
+               style="color: #FFF; font-weight: bold; text-decoration: underline; font-size: 20px;">
+               Open Post-Game Form &raquo;
+            </a>
+        </div>
+
+        <button onclick="document.getElementById('info-overlay').style.display='none'" 
+            style="
+                background-color: #555; 
+                color: white;
+                border: 1px solid #777; 
+                padding: 10px 25px; 
+                font-size: 16px; 
+                border-radius: 5px; 
+                cursor: pointer;
+            "
+            onmouseover="this.style.backgroundColor='#666'"
+            onmouseout="this.style.backgroundColor='#555'"
+        >
+            Close Overlay
+        </button>
+
+    </div>
+    """
+    return html

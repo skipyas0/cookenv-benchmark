@@ -1,5 +1,5 @@
 Ingredients: 1, 2
 Appliances: A
 Goal: 4
-1 -> A = 3 (3)
-2, 3 -> A = 4 (5)
+1 -> A = 3 (5)
+2, 3 -> A = 4 (2)

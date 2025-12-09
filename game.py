@@ -39,7 +39,7 @@ from bfs  import pathfind_neighbor_any, Position
 import sys
 import time
 import re
-from ui_overlay import draw_game_info, draw_level_info, BrowserUI, game_text, get_image_data_url
+from ui_overlay import draw_game_info, draw_level_info, BrowserUI, generate_welcome_html, generate_end_html
 from game_utils import send_score, list_levels_dir, prompt_username_pygame, _load_appliance_colors, _load_asset
 
 if sys.platform == "emscripten":
@@ -91,10 +91,11 @@ async def play_levels(start_folder: str | None = None, use_text: bool = True, pa
 			idx = levels.index(start_folder)
 		except ValueError:
 			idx = 0
-
+	ui = BrowserUI()
 	# ask for username
 	username = "text_player"
 	if not use_text:
+		ui.show_html(generate_welcome_html("https://docs.google.com/forms/d/e/1FAIpQLSfwR_Lli2yT9GHLi-krLwdXSS5CBvI2__wI_9cAUDij2QWHRQ/viewform?usp=dialog"))
 		try:
 			username = await prompt_username_pygame()
 		except Exception:
@@ -153,6 +154,8 @@ async def play_levels(start_folder: str | None = None, use_text: bool = True, pa
 		# exit or unknown -> break
 		print("Exiting level play")
 		break
+	if not use_text:
+		ui.show_html(generate_end_html("https://docs.google.com/forms/d/e/1FAIpQLSeKPSA57O5TPji9npJsVBbHbODVpX5AX440SCUmS3NkRAXXXQ/viewform?usp=dialog"))
 
 
 class Game:
