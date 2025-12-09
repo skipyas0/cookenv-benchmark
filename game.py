@@ -573,7 +573,7 @@ class Game:
 							for ry, rrow in enumerate(self.grid):
 								for rx, blk in enumerate(rrow):
 									if isinstance(blk, Appliance):
-										blk.tick()
+										blk.tick(self.progress)
 										# after ticking, attempt to start any eligible op
 										blk.try_start_operations(player.game_time)
 									elif isinstance(blk, Dispenser):
@@ -602,7 +602,7 @@ class Game:
 						for ry, rrow in enumerate(self.grid):
 							for rx, blk in enumerate(rrow):
 								if isinstance(blk, Appliance):
-									blk.tick()
+									blk.tick(self.progress)
 									blk.try_start_operations([player.operation])
 								elif isinstance(blk, Dispenser):
 									blk.tick()
