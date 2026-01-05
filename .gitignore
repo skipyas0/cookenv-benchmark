@@ -7,3 +7,6 @@ worker.js
 level_archive
 *.log
 *.json
+results-cot
+results-nocot
+*.jsonl

@@ -106,7 +106,7 @@ async def play_levels(start_folder: str | None = None, use_text: bool = True, pa
 	score_file = Path("levels") / f"scores-{datetime.now().isoformat()}.txt"
 	while idx < len(levels):
 		lvl_path = levels[idx]
-		print(f"Loading level: {lvl_path}")
+		#print(f"Loading level: {lvl_path}")
 		lvl = Level.load_from_folder(lvl_path)
 		game = Game.from_level(lvl)
 
@@ -445,6 +445,9 @@ class Game:
 		cols = len(self.grid[0])
 
 		info_press_counter = 0
+		game_info_display_time = 0
+		level_info_display_time = 0
+		display_start = time.time()
 
 		# attempt to scale tile size so the whole grid + HUD fits on the display
 		if scale_to_display:
@@ -515,32 +518,41 @@ class Game:
 				if event.type == pygame.QUIT:
 					running = False
 				elif event.type == pygame.KEYDOWN:
-
+					
 					if DEBUG:
 						#give_up
 						if event.key == pygame.K_k:
 							if sys.platform != "emscripten":
 								pygame.quit()
-							return 0, player.game_time, "continue", info_press_counter, self.progress
+							return 0, player.game_time, "continue", (info_press_counter, game_info_display_time, level_info_display_time), self.progress
 						#restart
 						if event.key == pygame.K_o:
 							if sys.platform != "emscripten":
 								pygame.quit()
-							return 0, player.game_time, "repeat", info_press_counter, self.progress
+							return 0, player.game_time, "repeat", (info_press_counter, game_info_display_time, level_info_display_time), self.progress
 						
 						#level_skip :)
 						if event.key == pygame.K_l:
 							if sys.platform != "emscripten":
 								pygame.quit()
-							return -1, player.game_time, "level_skip", info_press_counter, self.progress
+							return -1, player.game_time, "level_skip", (info_press_counter, game_info_display_time, level_info_display_time), self.progress
 
 					# toggle info screen with 'E'
 					
 
 					if event.key == pygame.K_e:
+						click_time = time.time()
+						displayed_time = click_time - display_start
+						if show_info == 1:
+							game_info_display_time += displayed_time
+						elif show_info == 2:
+							level_info_display_time += displayed_time
+						display_start = click_time
 						show_info = (show_info + 1) % 3	
-							
+						info_press_counter += 1
+						
 					if show_info == 1:
+						
 						ui.show_game_info()
 						continue
 					elif show_info == 2:
@@ -744,11 +756,11 @@ class Game:
 			# only call pygame.quit() on native platforms; pygbag manages lifecycle in the browser
 			if sys.platform != "emscripten":
 				pygame.quit()
-			return 1, player.game_time, end_choice, info_press_counter, self.progress
+			return 1, player.game_time, end_choice, (info_press_counter, game_info_display_time, level_info_display_time), self.progress
 		else:
 			if sys.platform != "emscripten":
 				pygame.quit()
-			return 1, player.game_time, None, info_press_counter, self.progress
+			return 1, player.game_time, None, (info_press_counter, game_info_display_time, level_info_display_time), self.progress
 
 	def __print_board(self,player : Player):
 		print(self.draw(player))
@@ -780,14 +792,15 @@ class Game:
 					else:
 						status="unavailable"
 						print(f"  {blk.id} at ({xx},{yy}): {status};")
-		print("Tables:")
-		for yy, row in enumerate(self.grid):
-			for xx, blk in enumerate(row):
-				if isinstance(blk, Table):
-					if blk.has_item():
-						print(f" Table at ({xx},{yy}): {blk.itemId}")
-					else:
-						print(f" Table at ({xx},{yy}): EMPTY")
+		# print("Tables:")
+		# for yy, row in enumerate(self.grid):
+		# 	for xx, blk in enumerate(row):
+		# 		if isinstance(blk, Table):
+		# 			if blk.has_item():
+		# 				print(f" Table at ({xx},{yy}): {blk.itemId}")
+		# 			else:
+		# 				print(f" Table at ({xx},{yy}): EMPTY")
+		
 
 
 	def __print_info(self):
@@ -825,7 +838,7 @@ class Game:
 					elif isinstance(blk, Dispenser):
 						blk.tick()
 				
-	def run_text(self, use_pathfinding_control: bool = True):
+	def run_text(self, use_pathfinding_control: bool = True, auto_continue = True):
 		"""Run a simple text-mode loop.
 
 		Commands in normal mode:
@@ -867,10 +880,10 @@ class Game:
 		if player is None:
 			raise RuntimeError("No walkable tile found to place the player")
 
-		print("Text-mode controls: up/down/left/right, interact, info, skip, quit, restart, give_up, level_skip")
-		self.__print_board(player)
+		self.__print_info()
 		while True:
-			cmd = input("> ").strip().lower()
+			self.__print_board(player)
+			cmd = input(" > ").strip().lower()
 			if not cmd:
 				continue
 			if cmd in ("quit", "exit"):
@@ -896,41 +909,8 @@ class Game:
 			if cmd == "drop":
 				print(f"Dropped current item: {player.inventory}")
 				player.inventory = None
-
-
-			if not use_pathfinding_control and cmd == "interact":
-				changed = player.interact(self.grid)
-				if changed:
-					print("Interaction succeeded")
-					if self.goal is not None and player.inventory == self.goal:
-						print(
-							f"Goal achieved: player has item {self.goal} at time {player.game_time}"
-						)
-						choice = None
-						while choice not in ("r", "c", "e"):
-							choice = (
-								input(
-									"Level complete. (r) repeat, (c) continue, (e) exit: "
-								)
-								.strip()
-								.lower()
-							)
-							if choice not in ("r", "c", "e"):
-								print("Please choose r, c or e")
-						if choice == "r":
-							return 1, player.game_time, "repeat", info_press_counter, self.progress
-						if choice == "c":
-							return (
-								1,
-								player.game_time,
-								"continue",
-								info_press_counter,
-								self.progress
-							)
-						return 1, player.game_time, "exit", info_press_counter, self.progress
-				else:
-					print("Nothing happened")
 				continue
+
 			
 			interact_patter=r"interact\s*\(\s*(-?\d+)\s*,\s*(-?\d+)\s*\)"
 			nav_cmd = re.match(interact_patter,cmd)
@@ -987,7 +967,7 @@ class Game:
 						print(
 							f"Goal achieved: player has item {self.goal} at time {player.game_time}"
 						)
-						choice = None
+						choice = "c" if auto_continue else None
 						while choice not in ("r", "c", "e"):
 							choice = (
 								input(
@@ -1010,62 +990,12 @@ class Game:
 						return 1, player.game_time, "exit", info_press_counter, self.progress
 				else:
 					print("Nothing happened")
-				self.__print_board(player)
+				
 				continue
-
-			# movement commands
-			
-			if not use_pathfinding_control and cmd in ("up", "down", "left", "right"):
-				dx = dy = 0
-				if cmd == "up":
-					new_orient = "up"
-					dy = -1
-				elif cmd == "down":
-					new_orient = "down"
-					dy = 1
-				elif cmd == "left":
-					new_orient = "left"
-					dx = -1
-				else:
-					new_orient = "right"
-					dx = 1
-				# set orientation (no time pass)
-				player.set_orientation(new_orient)
-				moved = player.try_move(dx, dy, self.grid)
-				if moved:
-					# tick appliances and attempt to start ops
-					self.tick_blocks(1)
-					if self.goal is not None and player.inventory == self.goal:
-						print(
-							f"Goal achieved: player has item {self.goal} at time {player.game_time}"
-						)
-						choice = None
-						while choice not in ("r", "c", "e"):
-							choice = (
-								input(
-									"Level complete. (r) repeat, (c) continue, (e) exit: "
-								)
-								.strip()
-								.lower()
-							)
-							if choice not in ("r", "c", "e"):
-								print("Please choose r, c or e")
-						if choice == "r":
-							return 1, player.game_time, "repeat", info_press_counter, self.progress
-						if choice == "c":
-							return 1, player.game_time, "continue", info_press_counter, self.progress
-						return 1, player.game_time, "exit", info_press_counter, self.progress
-				else:
-					print("Move blocked or out of bounds")
-				self.__print_board(player)
-				continue
-
 
 			# unknown command
 			if use_pathfinding_control:
-				print("Unknown command. Use interact (x, y), info, skip, drop, quit")
-			else:
-				print("Unknown command. Use up/down/left/right, interact, info, skip, drop, quit")
+				print("Unknown command. Use interact (x, y), info, drop")
 
 
 if __name__ == "__main__":

@@ -22,7 +22,7 @@ Project layout
 - `player.py` — Player class (movement, orientation, inventory, drawing).
 - `states.py` — `Operation` dataclass and `Level` loader (parses level folders).
 - `levels/` — example level folders (each level has `maze.txt`, `recipe.txt`, `mapping.txt`, and `desc.txt`).
-- `assets/` — optional image assets (floor.png, wall.png, appliance_X.png, dispenser_overlay.png, player sprites) and `appliance_colors.csv` for appliance-specific colors.
+- `assets/` — image assets for sprites, appliances and ingredients
 
 Level format
 ------------
@@ -43,58 +43,61 @@ Each level is a folder with the following files:
   - `1 ! 10` — Dispenser 1 stops giving ingredients after 10 steps
   - `Goal: 4` — the goal item id the player should obtain to finish the level
 
-Controls
+Pygame Controls
 --------
 
-- Movement: WASD or arrow keys. Changing orientation without moving is allowed.
+- Movement: WASD or arrow keys. Changing orientation without moving is allowed. 
 - Interact: SPACE — pick up from dispenser or appliance, or place an item into an appliance.
 - Pass time: Q — advance game time without moving (appliances tick).
 - Toggle info overlay: E — shows the textual `desc.txt` and `mapping.txt` in a formatted overlay. Press again to return to the game.
-- Restart: O — restarts the level
-- Level select: L
-- Give up: K — continues to the next level
+- Drop item: R - deletes the contents of your inventory to free it.
 
-Visuals and assets
-------------------
-
-- If `pygame` is available, the game renders a graphical window and draws tiles using assets in the `assets/` folder when available. If assets are missing, the game falls back to color fills and geometric drawings.
-- `appliance_colors.csv` in `assets/` can define RGB colors per appliance (e.g. `A, 206, 140, 73`). These colors are used for operation progress fills and for coloring appliance names in the info overlay.
-- For item dispensers and appliances defined in mapping.txt, the game tries to load a .png image for its associated name, where spaces in the name are replaced with underscores. If the resulting name matches an existing .png file in the assets directory, the image icon will be successfully loaded. If not, the game falls back to the character coding with `appliance_colors.csv` visualisation
-
-Extensibility and development notes
------------------------------------
-
-- The code is modular: add new Block subclasses in `blocks.py` and update `Game.from_text_map` mapping if you want new tile types.
-- `Level` parsing is intentionally tolerant: malformed lines are skipped rather than crashing. If you need stricter validation, we can add schema checks.
-- The UI overlay is text-wrapped and shows description and mapping in separate columns. For long descriptions we may want to add vertical scrolling.
-
-Running the game
+Installing dependencies
 ----------------
 
-1. Install dependencies (pygame):
-
+Run 
 ```bash
-python3 -m pip install pygame
+pip install -r requirements.txt
 ```
 
-2. Run the demo level:
+Running the game with Pygbag
+----------------
+
+1. Compile the game using Pygbag:
 
 ```bash
-python3 game.py
+python -m pygbag main.py
 ```
 
-(If you prefer a fixed tile size or to disable automatic scaling to the display, call `Game.run_pygame(scale_to_display=False)` from a small wrapper.)
+2. Open the game in the browser (http://localhost:8000/)
 
-Next improvements you might want
-------------------------------
+Alternative: try the [hosted experiment](skipyas0.github.io/cookenv-benchmark).
 
-- Add vertical scrolling for the info overlay.
-- Improve recipe parsing and validation and provide a `build_level.py` helper for level authors.
+Text-mode Controls
+----------------
+- Interact: Write a command in the format ```interact (x,y)```, where the coordinates $(x, y)$ contain a valid object. The player automatically navigates to the object and interacts with it. If the object is busy, time is skipped automatically.
+- Drop: Write the ```drop``` command to empty your inventory.
+- Skip: Explicitly skip game time by writing ```skip```.
 
-Contributing
-------------
+Running the game in text-mode
+----------------
+Run the ```game.py``` file like this.
+```bash
+python game.py
+```
 
-This is a small educational project — contributions are welcome. Please open a PR with small, focused changes and include a short description of the behavioral change and a screenshot if applicable.
+Running the benchmark
+----------------
+1. Put your OpenAI API key in a ```.env``` file, like this:
+```
+OPENAI_API_KEY=sk-proj-XXXXXXXX
+```
+
+2. Run the ```benchmark.py``` file:
+```
+python benchmark_batch.py --model gpt-5-mini --instances 5 --steps 20
+```
+You can use the ```--mock``` argument to run the benchmark in debug mode (no LLM calls).
 
 License
 -------
@@ -105,4 +108,5 @@ Credits
 -------
 
 icons by [icons8](https://icons8.com/)
+
 game assets by [kenney](https://kenney.nl)
